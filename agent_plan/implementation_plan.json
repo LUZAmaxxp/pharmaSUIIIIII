@@ -1,0 +1,757 @@
+{
+  "meta": {
+    "project": "Pharmacie en Ligne — Admin Workflow",
+    "course": "INF4121 Printemps 2026",
+    "team": ["Ayman Allouch", "Sallahedin Hamzi", "Sami Atlagh", "Walid Abaaqil"],
+    "plan_version": "1.0.0",
+    "created_at": "2026-05-20",
+    "execution_model": "sequential-phases / parallel-subtasks-within-phase",
+    "audit_strategy": "After each phase ends, the orchestrating agent creates agent_plan/audits/phase_N_audit.json capturing findings, risks, and lessons learned before unlocking the next phase."
+  },
+
+  "workflow_rules": {
+    "phase_gate": "A phase may NOT start until the previous phase's audit file is written and all subtasks have status = 'done'.",
+    "audit_file_location": "agent_plan/audits/phase_<N>_audit.json",
+    "subtask_status_values": ["pending", "in-progress", "done", "blocked"],
+    "agent_contract": "Each sub-agent receives only its own phase object plus the global context block. It must update every subtask status and append findings[] before triggering the audit step.",
+    "error_recovery": "If a subtask is blocked, the agent records the blocker in findings[], proposes a fix, and escalates to the orchestrator before proceeding.",
+    "quality_gates": {
+      "jacoco_minimum_instruction_coverage": 0.80,
+      "jacoco_minimum_branch_coverage": 0.70,
+      "newman_failed_tests_allowed": 0,
+      "design_patterns_required": 4,
+      "tdd_features_minimum": 2,
+      "swagger_endpoints_documented": true,
+      "audit_log_on_every_status_toggle": true
+    }
+  },
+
+  "global_context": {
+    "base_package": "com.pharmacy",
+    "admin_package": "com.pharmacy.admin",
+    "api_base_path": "/api/v1/admin",
+    "jwt_role_claim": "roles",
+    "admin_role_value": "ROLE_ADMIN",
+    "stack": {
+      "language": "Java 17+",
+      "framework": "Spring Boot 3.x",
+      "orm": "Spring Data JPA / Hibernate",
+      "database_prod": "MySQL 8+",
+      "database_test": "H2 in-memory",
+      "security": "Spring Security + JWT (jjwt 0.11.5)",
+      "docs": "springdoc-openapi 2.3.0",
+      "build": "Maven",
+      "coverage": "JaCoCo 0.8.11",
+      "api_tests": "Postman + Newman"
+    },
+    "shared_entities_already_exist": ["User", "Pharmacy", "Prescription", "Order"],
+    "design_patterns": ["Singleton", "Observer", "Factory Method", "Decorator"]
+  },
+
+  "phases": [
+    {
+      "phase_id": "P1",
+      "phase_name": "Foundation — Database & Persistence Layer",
+      "description": "Establish the database schema via Flyway and wire up all JPA entities and Spring Data repositories. Nothing above this layer compiles without it.",
+      "assigned_agent": "DatabaseAgent",
+      "depends_on": [],
+      "audit_file": "agent_plan/audits/phase_1_audit.json",
+      "subtasks": [
+        {
+          "id": "P1-T1",
+          "original_task_ref": "T1",
+          "title": "Flyway Migration V3 — Admin Schema",
+          "status": "pending",
+          "priority": "critical",
+          "owner": "DatabaseAgent",
+          "output_file": "src/main/resources/db/migration/V3__admin_schema.sql",
+          "instructions": [
+            "ALTER TABLE pharmacies ADD COLUMN IF NOT EXISTS active TINYINT(1) NOT NULL DEFAULT 1",
+            "CREATE TABLE admin_users (id BIGINT AUTO_INCREMENT PK, user_id BIGINT NOT NULL UNIQUE FK->users(id), created_at DATETIME DEFAULT CURRENT_TIMESTAMP)",
+            "CREATE TABLE audit_logs (id BIGINT AUTO_INCREMENT PK, admin_id BIGINT NOT NULL FK->users(id), action VARCHAR(100) NOT NULL, target_type VARCHAR(60), target_id BIGINT, detail TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)"
+          ],
+          "acceptance_criteria": [
+            "Migration runs cleanly on a fresh MySQL 8 schema",
+            "IF NOT EXISTS guard prevents re-run failures",
+            "All foreign keys reference the correct shared tables"
+          ],
+          "known_risks": [
+            "Shared 'pharmacies' table may already have an 'active' column in another team's migration — use IF NOT EXISTS",
+            "Flyway checksum mismatch if file is edited after first run — never modify applied migrations"
+          ]
+        },
+        {
+          "id": "P1-T2",
+          "original_task_ref": "T2",
+          "title": "JPA Entities — AdminUser & AuditLog",
+          "status": "pending",
+          "priority": "critical",
+          "owner": "DatabaseAgent",
+          "output_files": [
+            "src/main/java/com/pharmacy/admin/entity/AdminUser.java",
+            "src/main/java/com/pharmacy/admin/entity/AuditLog.java"
+          ],
+          "instructions": [
+            "AdminUser: @Entity @Table(name='admin_users'), Long id, @OneToOne User user, LocalDateTime createdAt @CreationTimestamp",
+            "AuditLog: @Entity @Table(name='audit_logs'), Long id, Long adminId, String action, String targetType, Long targetId, String detail, LocalDateTime createdAt @CreationTimestamp"
+          ],
+          "acceptance_criteria": [
+            "Both entities compile with no warnings",
+            "AdminUser.user is lazy-loaded (@OneToOne(fetch=LAZY))",
+            "@CreationTimestamp populates createdAt automatically"
+          ],
+          "known_risks": [
+            "Bidirectional mapping cycles can cause infinite JSON serialization — annotate with @JsonIgnoreProperties if needed",
+            "Missing @Column(nullable=false) on required fields causes silent null inserts"
+          ]
+        },
+        {
+          "id": "P1-T3",
+          "original_task_ref": "T3",
+          "title": "Spring Data Repositories",
+          "status": "pending",
+          "priority": "high",
+          "owner": "DatabaseAgent",
+          "output_files": [
+            "src/main/java/com/pharmacy/admin/repository/AdminUserRepository.java",
+            "src/main/java/com/pharmacy/admin/repository/AuditLogRepository.java"
+          ],
+          "instructions": [
+            "AdminUserRepository extends JpaRepository<AdminUser, Long>",
+            "AuditLogRepository extends JpaRepository<AuditLog, Long> + custom method: Page<AuditLog> findAllByOrderByCreatedAtDesc(Pageable pageable)"
+          ],
+          "acceptance_criteria": [
+            "Both interfaces compile and Spring Boot auto-creates implementations",
+            "Derived query method name matches the JPA naming convention exactly"
+          ],
+          "known_risks": [
+            "Typo in derived query method name (e.g., OrderBy vs orderBy casing) causes startup failure",
+            "Missing @Repository annotation is fine — JpaRepository implies it, but confirm Spring component scan covers the package"
+          ]
+        }
+      ],
+      "phase_exit_criteria": [
+        "All P1 subtasks status = 'done'",
+        "mvn flyway:migrate runs without errors on test DB",
+        "mvn test -pl . compiles (entities and repos loadable by Spring context)",
+        "audit file agent_plan/audits/phase_1_audit.json written by DatabaseAgent"
+      ]
+    },
+
+    {
+      "phase_id": "P2",
+      "phase_name": "Domain Layer — DTOs & Design Patterns",
+      "description": "Implement the data-transfer objects and the two non-service design patterns: Observer (event + listener) and Factory Method (notification factory). These are pure Java with no web tier dependency.",
+      "assigned_agent": "DomainAgent",
+      "depends_on": ["P1"],
+      "audit_file": "agent_plan/audits/phase_2_audit.json",
+      "subtasks": [
+        {
+          "id": "P2-T4",
+          "original_task_ref": "T4",
+          "title": "DTOs — Java Records",
+          "status": "pending",
+          "priority": "high",
+          "owner": "DomainAgent",
+          "output_files": [
+            "src/main/java/com/pharmacy/admin/dto/UserSummaryDTO.java",
+            "src/main/java/com/pharmacy/admin/dto/PharmacySummaryDTO.java",
+            "src/main/java/com/pharmacy/admin/dto/DashboardStatsDTO.java",
+            "src/main/java/com/pharmacy/admin/dto/PharmacyStatusUpdateDTO.java"
+          ],
+          "instructions": [
+            "UserSummaryDTO record: Long id, String email, String role, LocalDateTime createdAt",
+            "PharmacySummaryDTO record: Long id, String name, String address, boolean active, Double latitude, Double longitude",
+            "DashboardStatsDTO record: long totalUsers, long totalPharmacies, long activePharmacies, long totalPrescriptions, long prescriptionsToday, double treatmentRatePercent",
+            "PharmacyStatusUpdateDTO class (not record — needs Bean Validation): Boolean active with @NotNull(message='active field is required')"
+          ],
+          "acceptance_criteria": [
+            "Records compile under Java 17+",
+            "PharmacyStatusUpdateDTO fails validation when active is null",
+            "All DTO field names match the REST API spec in README section 5.2"
+          ],
+          "known_risks": [
+            "Java records cannot have mutable fields — ensure Jackson can deserialize them (requires jackson-databind >= 2.12 with parameter names module or @JsonCreator)",
+            "PharmacyStatusUpdateDTO must be a regular class to support @NotNull Bean Validation on fields"
+          ]
+        },
+        {
+          "id": "P2-T5",
+          "original_task_ref": "T5",
+          "title": "Observer Pattern — AdminActionEvent & AuditLogListener",
+          "status": "pending",
+          "priority": "high",
+          "owner": "DomainAgent",
+          "output_files": [
+            "src/main/java/com/pharmacy/admin/observer/AdminActionEvent.java",
+            "src/main/java/com/pharmacy/admin/observer/AuditLogListener.java"
+          ],
+          "instructions": [
+            "AdminActionEvent extends ApplicationEvent: fields Long adminId, String action, String targetType, Long targetId, String detail",
+            "AuditLogListener @Component: @EventListener(AdminActionEvent.class) @Async void handle(AdminActionEvent) — save AuditLog via AuditLogRepository",
+            "Add @EnableAsync to main @SpringBootApplication class"
+          ],
+          "acceptance_criteria": [
+            "@Async listener does not block the HTTP request thread",
+            "AuditLog is persisted to DB after each event",
+            "@EnableAsync is present exactly once in the application"
+          ],
+          "known_risks": [
+            "@Async requires a thread pool — default SimpleAsyncTaskExecutor is not production-grade; configure a ThreadPoolTaskExecutor bean if needed",
+            "If @EnableAsync is missing, @Async is silently ignored — test async behavior explicitly",
+            "Async exceptions are swallowed by default — consider an AsyncUncaughtExceptionHandler"
+          ]
+        },
+        {
+          "id": "P2-T6",
+          "original_task_ref": "T6",
+          "title": "Factory Method Pattern — NotificationFactory",
+          "status": "pending",
+          "priority": "medium",
+          "owner": "DomainAgent",
+          "output_files": [
+            "src/main/java/com/pharmacy/admin/factory/Notification.java",
+            "src/main/java/com/pharmacy/admin/factory/EmailNotification.java",
+            "src/main/java/com/pharmacy/admin/factory/SmsNotification.java",
+            "src/main/java/com/pharmacy/admin/factory/NotificationFactory.java"
+          ],
+          "instructions": [
+            "Notification interface: void send()",
+            "EmailNotification: stores recipient + message, send() logs via SLF4J 'Sending EMAIL to {}: {}'",
+            "SmsNotification: same structure, logs 'Sending SMS to {}: {}'",
+            "NotificationFactory: static createNotification(String type, String recipient, String message) — returns EmailNotification if type.equalsIgnoreCase('EMAIL'), else SmsNotification"
+          ],
+          "acceptance_criteria": [
+            "createNotification('EMAIL', ...) returns an EmailNotification instance",
+            "createNotification('SMS', ...) returns an SmsNotification instance",
+            "Unknown type falls back to SmsNotification (documented behavior)",
+            "No Spring beans — pure factory, instantiated directly"
+          ],
+          "known_risks": [
+            "Case sensitivity bugs if type check uses == instead of equalsIgnoreCase",
+            "No null-check on type parameter — add guard for null input to avoid NPE"
+          ]
+        }
+      ],
+      "phase_exit_criteria": [
+        "All P2 subtasks status = 'done'",
+        "mvn compile succeeds with no errors",
+        "PharmacyStatusUpdateDTO validation test passes (null active -> ConstraintViolation)",
+        "audit file agent_plan/audits/phase_2_audit.json written by DomainAgent"
+      ]
+    },
+
+    {
+      "phase_id": "P3",
+      "phase_name": "Service Layer — Business Logic, Singleton & Decorator",
+      "description": "Implement all service beans including the Singleton dashboard aggregator and the Decorator wrapper for logging. Also implement the Global Exception Handler.",
+      "assigned_agent": "ServiceAgent",
+      "depends_on": ["P2"],
+      "audit_file": "agent_plan/audits/phase_3_audit.json",
+      "subtasks": [
+        {
+          "id": "P3-T7a",
+          "original_task_ref": "T7",
+          "title": "AdminUserService",
+          "status": "pending",
+          "priority": "high",
+          "owner": "ServiceAgent",
+          "output_file": "src/main/java/com/pharmacy/admin/service/AdminUserService.java",
+          "instructions": [
+            "Page<UserSummaryDTO> getAllUsers(Pageable p): delegate to userRepository.findAll(p), map each User -> UserSummaryDTO manually",
+            "UserSummaryDTO getUserById(Long id): throw EntityNotFoundException if not found"
+          ],
+          "acceptance_criteria": [
+            "Manual mapping — no MapStruct dependency",
+            "EntityNotFoundException message: 'User with id {id} not found'",
+            "Pageable is passed through without modification"
+          ],
+          "known_risks": [
+            "User entity must have a 'role' field or getRoles() — verify shared entity schema before mapping",
+            "Page.map() is the idiomatic way to transform Page content — avoid collecting to list and re-wrapping"
+          ]
+        },
+        {
+          "id": "P3-T7b",
+          "original_task_ref": "T7",
+          "title": "AdminPharmacyServiceI interface + AdminPharmacyService impl",
+          "status": "pending",
+          "priority": "critical",
+          "owner": "ServiceAgent",
+          "output_files": [
+            "src/main/java/com/pharmacy/admin/service/AdminPharmacyServiceI.java",
+            "src/main/java/com/pharmacy/admin/service/AdminPharmacyService.java"
+          ],
+          "instructions": [
+            "Interface: Page<PharmacySummaryDTO> getAllPharmacies(Pageable); PharmacySummaryDTO getPharmacyById(Long); PharmacySummaryDTO updateStatus(Long id, boolean active, Long adminId)",
+            "Impl: inject PharmacyRepository, ApplicationEventPublisher, use NotificationFactory. In updateStatus: fetch, set active, save, publish AdminActionEvent, call NotificationFactory.createNotification('EMAIL', pharmacy.getEmail(), '...').send()"
+          ],
+          "acceptance_criteria": [
+            "updateStatus publishes exactly one AdminActionEvent per call",
+            "EntityNotFoundException thrown when pharmacy ID not found",
+            "Notification is always sent after successful save"
+          ],
+          "known_risks": [
+            "PharmacyRepository is a shared repository — do not re-declare it; inject from the shared package",
+            "ApplicationEventPublisher must be injected, not retrieved from context manually",
+            "Email field may be null on some Pharmacy rows — null-safe the notification call"
+          ]
+        },
+        {
+          "id": "P3-T7c",
+          "original_task_ref": "T7",
+          "title": "Decorator — LoggingAdminPharmacyService (@Primary)",
+          "status": "pending",
+          "priority": "high",
+          "owner": "ServiceAgent",
+          "output_file": "src/main/java/com/pharmacy/admin/service/LoggingAdminPharmacyService.java",
+          "instructions": [
+            "@Primary @Service implements AdminPharmacyServiceI",
+            "Constructor-inject AdminPharmacyService (the concrete impl, not the interface)",
+            "Each method: log entry (INFO) -> delegate -> log exit (INFO) -> return result"
+          ],
+          "acceptance_criteria": [
+            "@Primary ensures this is the default bean injected everywhere",
+            "Delegate is the raw AdminPharmacyService, not the decorated version (avoids infinite loop)",
+            "Logging does not alter return values or throw additional exceptions"
+          ],
+          "known_risks": [
+            "If delegate is injected as AdminPharmacyServiceI Spring may inject LoggingAdminPharmacyService back into itself (circular) — always inject the concrete class AdminPharmacyService",
+            "@Primary without @Qualifier on the delegate injection point causes ambiguity — use @Qualifier('adminPharmacyService') on the constructor param"
+          ]
+        },
+        {
+          "id": "P3-T7d",
+          "original_task_ref": "T7",
+          "title": "Singleton — AdminDashboardService",
+          "status": "pending",
+          "priority": "high",
+          "owner": "ServiceAgent",
+          "output_file": "src/main/java/com/pharmacy/admin/service/AdminDashboardService.java",
+          "instructions": [
+            "@Service (Singleton via Spring IoC)",
+            "Inject: UserRepository, PharmacyRepository, PrescriptionRepository, OrderRepository",
+            "getStats(): compute DashboardStatsDTO — totalUsers, totalPharmacies, activePharmacies (count where active=true), totalPrescriptions, prescriptionsToday (createdAt >= today), treatmentRatePercent",
+            "Add Javadoc: '/** Singleton — single instance managed by Spring IoC container. */'"
+          ],
+          "acceptance_criteria": [
+            "treatmentRatePercent = (prescriptionsToday / totalPrescriptions) * 100 — handle division by zero",
+            "Javadoc explicitly documents the Singleton pattern",
+            "All repository calls are read-only (no save/delete)"
+          ],
+          "known_risks": [
+            "PrescriptionRepository.countByCreatedAtGreaterThanEqual(today) requires a @Query or derived method — verify shared repo exposes this or add a custom query",
+            "Division by zero when totalPrescriptions = 0 — default treatmentRatePercent to 0.0",
+            "Shared repositories may not be in the admin package — confirm package scan includes them"
+          ]
+        },
+        {
+          "id": "P3-T8",
+          "original_task_ref": "T8",
+          "title": "Global Exception Handler",
+          "status": "pending",
+          "priority": "high",
+          "owner": "ServiceAgent",
+          "output_file": "src/main/java/com/pharmacy/admin/exception/GlobalExceptionHandler.java",
+          "instructions": [
+            "@RestControllerAdvice",
+            "EntityNotFoundException -> 404 JSON: {timestamp, status:404, error:'Not Found', message, path}",
+            "MethodArgumentNotValidException -> 400 with field error list",
+            "AccessDeniedException -> 403",
+            "Exception (fallback) -> 500"
+          ],
+          "acceptance_criteria": [
+            "All error responses use the unified error envelope schema from README section 5.3",
+            "HttpServletRequest injected to extract path for error body",
+            "400 response lists ALL field validation errors, not just the first"
+          ],
+          "known_risks": [
+            "If another @ControllerAdvice exists in the shared package, handler order may conflict — use @Order(Ordered.HIGHEST_PRECEDENCE)",
+            "AccessDeniedException is in spring-security — ensure the dependency is on the classpath before handling it",
+            "Generic Exception handler may swallow useful context — log at ERROR level before returning 500"
+          ]
+        }
+      ],
+      "phase_exit_criteria": [
+        "All P3 subtasks status = 'done'",
+        "mvn compile succeeds",
+        "LoggingAdminPharmacyService is @Primary and no circular bean dependency",
+        "AdminDashboardService Javadoc present",
+        "audit file agent_plan/audits/phase_3_audit.json written by ServiceAgent"
+      ]
+    },
+
+    {
+      "phase_id": "P4",
+      "phase_name": "API Layer — Security & REST Controllers",
+      "description": "Wire up Spring Security JWT configuration and implement all three REST controllers with full OpenAPI/Swagger annotations.",
+      "assigned_agent": "APIAgent",
+      "depends_on": ["P3"],
+      "audit_file": "agent_plan/audits/phase_4_audit.json",
+      "subtasks": [
+        {
+          "id": "P4-T9",
+          "original_task_ref": "T9",
+          "title": "Security Configuration — AdminSecurityConfig",
+          "status": "pending",
+          "priority": "critical",
+          "owner": "APIAgent",
+          "output_file": "src/main/java/com/pharmacy/admin/security/AdminSecurityConfig.java",
+          "instructions": [
+            "@Configuration @EnableWebSecurity @EnableMethodSecurity",
+            "SecurityFilterChain: permit /api/v1/auth/**, /swagger-ui/**, /v3/api-docs/**; hasRole('ADMIN') for /api/v1/admin/**; anyRequest authenticated",
+            "Add JwtAuthenticationFilter before UsernamePasswordAuthenticationFilter",
+            "PasswordEncoder bean: BCryptPasswordEncoder(strength=12)",
+            "SessionCreationPolicy.STATELESS"
+          ],
+          "acceptance_criteria": [
+            "Unauthenticated requests to /api/v1/admin/** return 403",
+            "Non-ADMIN JWT tokens receive 403 on admin endpoints",
+            "Swagger UI is accessible without auth",
+            "Session is stateless (no JSESSIONID cookie)"
+          ],
+          "known_risks": [
+            "If JwtAuthenticationFilter is defined in a shared package, import it correctly — do not redefine it",
+            "Multiple SecurityFilterChain beans in the same application cause order conflicts — use @Order or merge configs",
+            "CSRF must be disabled for stateless REST API",
+            "CORS may need to be configured if frontend is on a different origin"
+          ]
+        },
+        {
+          "id": "P4-T10a",
+          "original_task_ref": "T10",
+          "title": "AdminUserController",
+          "status": "pending",
+          "priority": "high",
+          "owner": "APIAgent",
+          "output_file": "src/main/java/com/pharmacy/admin/controller/AdminUserController.java",
+          "instructions": [
+            "GET /api/v1/admin/users (Pageable, @PageableDefault(size=10)) -> 200 Page<UserSummaryDTO>",
+            "GET /api/v1/admin/users/{id} -> 200 UserSummaryDTO or 404",
+            "@Operation and @ApiResponse for each endpoint",
+            "@PreAuthorize(\"hasRole('ADMIN')\")"
+          ],
+          "acceptance_criteria": [
+            "Pageable defaults to size=10",
+            "404 from service propagates through GlobalExceptionHandler",
+            "Swagger UI shows both endpoints under 'Admin' tag"
+          ],
+          "known_risks": [
+            "@PageableDefault only works if Spring MVC PageableHandlerMethodArgumentResolver is registered (auto-configured by spring-boot-starter-data-jpa)",
+            "Returning Page<> directly serializes Spring's Page implementation — consider wrapping or using @JsonView for cleaner API"
+          ]
+        },
+        {
+          "id": "P4-T10b",
+          "original_task_ref": "T10",
+          "title": "AdminPharmacyController",
+          "status": "pending",
+          "priority": "high",
+          "owner": "APIAgent",
+          "output_file": "src/main/java/com/pharmacy/admin/controller/AdminPharmacyController.java",
+          "instructions": [
+            "GET /pharmacies (Pageable) -> 200",
+            "GET /pharmacies/{id} -> 200 or 404",
+            "PATCH /pharmacies/{id}/status (@RequestBody @Valid PharmacyStatusUpdateDTO, @AuthenticationPrincipal to extract adminId) -> 200 PharmacySummaryDTO",
+            "@Operation and @ApiResponse annotations"
+          ],
+          "acceptance_criteria": [
+            "PATCH with null active body field returns 400 with validation error message",
+            "adminId extracted from JWT principal, not from request body (security requirement)",
+            "200 response on PATCH includes updated active value"
+          ],
+          "known_risks": [
+            "@AuthenticationPrincipal may return null if security context is not populated — add null check or handle in @ControllerAdvice",
+            "PATCH vs PUT semantics: PATCH is partial update — body should only contain fields being changed",
+            "adminId extraction depends on how UserDetails is implemented in the shared security package — verify field name"
+          ]
+        },
+        {
+          "id": "P4-T10c",
+          "original_task_ref": "T10",
+          "title": "AdminDashboardController",
+          "status": "pending",
+          "priority": "medium",
+          "owner": "APIAgent",
+          "output_file": "src/main/java/com/pharmacy/admin/controller/AdminDashboardController.java",
+          "instructions": [
+            "GET /api/v1/admin/dashboard -> 200 DashboardStatsDTO",
+            "@Operation summary: 'Get admin KPI dashboard statistics'",
+            "@ApiResponse for 200 and 403"
+          ],
+          "acceptance_criteria": [
+            "Response matches DashboardStatsDTO schema exactly",
+            "Endpoint documented in Swagger UI",
+            "Returns 403 without valid ADMIN JWT"
+          ],
+          "known_risks": [
+            "DashboardStatsDTO is a record — ensure Jackson serializes all record components correctly (Spring Boot 3.x handles this by default)"
+          ]
+        }
+      ],
+      "phase_exit_criteria": [
+        "All P4 subtasks status = 'done'",
+        "mvn spring-boot:run starts without errors",
+        "Swagger UI accessible at /swagger-ui/index.html",
+        "curl -X GET /api/v1/admin/users without token returns 403",
+        "audit file agent_plan/audits/phase_4_audit.json written by APIAgent"
+      ]
+    },
+
+    {
+      "phase_id": "P5",
+      "phase_name": "Testing & Quality Assurance",
+      "description": "Write all unit tests (TDD approach for T11), integration tests using H2, and the Postman/Newman collection. Validate JaCoCo coverage gates.",
+      "assigned_agent": "TestAgent",
+      "depends_on": ["P4"],
+      "audit_file": "agent_plan/audits/phase_5_audit.json",
+      "subtasks": [
+        {
+          "id": "P5-T11a",
+          "original_task_ref": "T11",
+          "title": "Unit Test — AdminUserServiceTest",
+          "status": "pending",
+          "priority": "high",
+          "owner": "TestAgent",
+          "output_file": "src/test/java/com/pharmacy/admin/AdminUserServiceTest.java",
+          "instructions": [
+            "Mock UserRepository with Mockito",
+            "Test: getAllUsers returns Page<UserSummaryDTO> with correct mappings",
+            "Test: getUserById returns DTO for valid ID",
+            "Test: getUserById throws EntityNotFoundException for unknown ID"
+          ],
+          "acceptance_criteria": [
+            "All 3 test cases pass",
+            "Mockito verifies repository interactions",
+            "No Spring context loaded (pure unit test)"
+          ],
+          "known_risks": [
+            "Page mocking requires PageImpl — use new PageImpl<>(list, pageable, totalCount)",
+            "EntityNotFoundException type must match what the service actually throws — import from the correct package"
+          ]
+        },
+        {
+          "id": "P5-T11b",
+          "original_task_ref": "T11",
+          "title": "Unit Test — AdminPharmacyServiceTest (TDD first)",
+          "status": "pending",
+          "priority": "critical",
+          "owner": "TestAgent",
+          "output_file": "src/test/java/com/pharmacy/admin/AdminPharmacyServiceTest.java",
+          "tdd_note": "Write tests BEFORE service implementation is finalized — this is a TDD task.",
+          "instructions": [
+            "Test: updateStatus sets active field correctly on saved entity",
+            "Test: updateStatus publishes exactly one AdminActionEvent via ApplicationEventPublisher",
+            "Test: updateStatus throws EntityNotFoundException for unknown pharmacy ID"
+          ],
+          "acceptance_criteria": [
+            "Tests written before or alongside implementation (TDD)",
+            "ArgumentCaptor used to verify event content",
+            "All 3 test cases pass"
+          ],
+          "known_risks": [
+            "Mocking ApplicationEventPublisher — verify(publisher).publishEvent(any(AdminActionEvent.class))",
+            "TDD order: test must fail first, then implementation makes it green — document this cycle in the audit"
+          ]
+        },
+        {
+          "id": "P5-T11c",
+          "original_task_ref": "T11",
+          "title": "Unit Test — AdminDashboardServiceTest",
+          "status": "pending",
+          "priority": "high",
+          "owner": "TestAgent",
+          "output_file": "src/test/java/com/pharmacy/admin/AdminDashboardServiceTest.java",
+          "instructions": [
+            "Mock all 4 repositories",
+            "Stub counts with known values",
+            "Test: getStats() returns DashboardStatsDTO with correct computed treatmentRatePercent",
+            "Test: treatmentRatePercent = 0.0 when totalPrescriptions = 0 (division-by-zero guard)"
+          ],
+          "acceptance_criteria": [
+            "Both test cases pass",
+            "treatmentRatePercent calculated correctly",
+            "Zero-division edge case covered"
+          ],
+          "known_risks": [
+            "Double comparison in assertions — use assertThat(result).isCloseTo(expected, offset(0.01))"
+          ]
+        },
+        {
+          "id": "P5-T11d",
+          "original_task_ref": "T11",
+          "title": "Unit Test — AuditLogListenerTest",
+          "status": "pending",
+          "priority": "medium",
+          "owner": "TestAgent",
+          "output_file": "src/test/java/com/pharmacy/admin/AuditLogListenerTest.java",
+          "instructions": [
+            "Create AdminActionEvent with known values",
+            "Call listener.handle(event) directly",
+            "Verify auditLogRepository.save() called once with matching AuditLog fields"
+          ],
+          "acceptance_criteria": [
+            "save() called exactly once",
+            "Saved AuditLog fields match event fields"
+          ],
+          "known_risks": [
+            "@Async is bypassed in direct method call tests — this is intentional for unit testing",
+            "Use ArgumentCaptor<AuditLog> to inspect the saved object"
+          ]
+        },
+        {
+          "id": "P5-T11e",
+          "original_task_ref": "T11",
+          "title": "Unit Test — AdminPharmacyControllerTest (@WebMvcTest)",
+          "status": "pending",
+          "priority": "high",
+          "owner": "TestAgent",
+          "output_file": "src/test/java/com/pharmacy/admin/AdminPharmacyControllerTest.java",
+          "instructions": [
+            "Use @WebMvcTest(AdminPharmacyController.class)",
+            "Test: PATCH /pharmacies/1/status with {active:false} -> 200",
+            "Test: PATCH /pharmacies/1/status with {} (missing active) -> 400",
+            "Test: PATCH /pharmacies/1/status without ADMIN role -> 403"
+          ],
+          "acceptance_criteria": [
+            "All 3 test cases pass",
+            "MockMvc used for HTTP-level assertions",
+            "Security context mocked with @WithMockUser(roles='ADMIN') for authorized tests"
+          ],
+          "known_risks": [
+            "@WebMvcTest does not load full security config by default — configure @MockBean for JwtAuthenticationFilter",
+            "@WithMockUser may not populate @AuthenticationPrincipal correctly for custom UserDetails — use @WithUserDetails or mock the principal"
+          ]
+        },
+        {
+          "id": "P5-T12",
+          "original_task_ref": "T12",
+          "title": "Integration Tests — AdminIntegrationTest",
+          "status": "pending",
+          "priority": "critical",
+          "owner": "TestAgent",
+          "output_file": "src/test/java/com/pharmacy/admin/AdminIntegrationTest.java",
+          "instructions": [
+            "@SpringBootTest(webEnvironment=RANDOM_PORT) @AutoConfigureMockMvc @ActiveProfiles('test')",
+            "application-test.yml: H2 in-memory, ddl-auto=create-drop",
+            "Seed AdminUser and Pharmacy in @BeforeEach via repositories",
+            "Test: GET /api/v1/admin/users with admin JWT -> 200, non-empty content",
+            "Test: PATCH /pharmacies/{id}/status {active:false} -> 200, active=false",
+            "Test: GET /dashboard -> 200, treatmentRatePercent present",
+            "Test: any admin endpoint without JWT -> 403",
+            "Helper: generateAdminJwt() using test secret from application-test.yml"
+          ],
+          "acceptance_criteria": [
+            "All 4 integration tests pass",
+            "H2 schema created by Flyway migrations in test profile",
+            "JWT generated with same secret as app config to avoid signature mismatch",
+            "Tests are isolated (@BeforeEach cleanup + recreate)"
+          ],
+          "known_risks": [
+            "Flyway may conflict with ddl-auto=create-drop — set spring.flyway.enabled=false in test profile and use ddl-auto=create-drop only",
+            "Shared entity tables (users, pharmacies) must be seeded before running admin tests",
+            "JWT secret in test config must match the secret in AdminSecurityConfig / JwtAuthenticationFilter"
+          ]
+        },
+        {
+          "id": "P5-T13",
+          "original_task_ref": "T13",
+          "title": "Postman Collection + Newman CI",
+          "status": "pending",
+          "priority": "medium",
+          "owner": "TestAgent",
+          "output_file": "Admin_Workflow.postman_collection.json",
+          "instructions": [
+            "Collection: 'Admin Workflow — INF4121'",
+            "Pre-request script: auto-login and store JWT token in pm.collectionVariables",
+            "Variables: baseUrl, adminEmail, adminPassword",
+            "7 requests as specified in T13 with pm.test assertions",
+            "Newman run command: newman run Admin_Workflow.postman_collection.json --reporters cli,json --reporter-json-export newman-report.json"
+          ],
+          "acceptance_criteria": [
+            "All 7 Postman tests pass against a running local server",
+            "Newman exits with code 0",
+            "newman-report.json generated for CI artifact storage"
+          ],
+          "known_risks": [
+            "Admin user must exist in the DB before collection runs — add a setup request or seed script",
+            "Token expiry between requests in a slow CI environment — set a generous JWT TTL for testing",
+            "Newman must be installed: npm install -g newman"
+          ]
+        },
+        {
+          "id": "P5-COV",
+          "original_task_ref": "quality_gates",
+          "title": "JaCoCo Coverage Validation",
+          "status": "pending",
+          "priority": "critical",
+          "owner": "TestAgent",
+          "instructions": [
+            "Run: mvn verify -Pjacoco",
+            "Enforce: instruction coverage >= 80%, branch coverage >= 70% on com.pharmacy.admin package",
+            "If coverage is below threshold, identify uncovered methods and add targeted tests"
+          ],
+          "acceptance_criteria": [
+            "mvn verify passes without JaCoCo threshold violations",
+            "Coverage report at target/site/jacoco/index.html reviewed"
+          ],
+          "known_risks": [
+            "Auto-generated Spring proxies inflate coverage numbers — exclude them with @Generated if needed",
+            "Branch coverage below 70% usually means missing negative/edge-case tests"
+          ]
+        }
+      ],
+      "phase_exit_criteria": [
+        "All P5 subtasks status = 'done'",
+        "mvn verify passes (all tests green, JaCoCo thresholds met)",
+        "newman run exits with code 0",
+        "audit file agent_plan/audits/phase_5_audit.json written by TestAgent"
+      ]
+    }
+  ],
+
+  "audit_file_schema": {
+    "description": "Schema every agent must follow when writing phase_N_audit.json at end of phase",
+    "template": {
+      "phase_id": "<string>",
+      "phase_name": "<string>",
+      "completed_at": "<ISO-8601 datetime>",
+      "agent": "<AgentName>",
+      "subtask_summary": [
+        {
+          "id": "<subtask id>",
+          "status": "done | blocked",
+          "notes": "<any notable observation>"
+        }
+      ],
+      "findings": [
+        {
+          "severity": "critical | high | medium | low",
+          "category": "bug | risk | design | missing-feature | test-gap",
+          "description": "<what was found>",
+          "file_affected": "<relative file path or null>",
+          "resolution": "<how it was fixed or mitigated>",
+          "lesson_learned": "<key takeaway to avoid this in future phases>"
+        }
+      ],
+      "quality_gate_results": {
+        "compile": "pass | fail",
+        "tests": "pass | fail | skipped",
+        "jacoco_instruction": "<percentage or N/A>",
+        "jacoco_branch": "<percentage or N/A>",
+        "newman": "pass | fail | N/A"
+      },
+      "recommendations_for_next_phase": [
+        "<actionable recommendation>"
+      ]
+    }
+  },
+
+  "execution_order_summary": [
+    "P1 → DatabaseAgent → writes phase_1_audit.json",
+    "P2 → DomainAgent  → writes phase_2_audit.json",
+    "P3 → ServiceAgent → writes phase_3_audit.json",
+    "P4 → APIAgent     → writes phase_4_audit.json",
+    "P5 → TestAgent    → writes phase_5_audit.json"
+  ]
+}

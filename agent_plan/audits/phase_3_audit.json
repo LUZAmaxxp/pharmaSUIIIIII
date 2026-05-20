@@ -1,0 +1,72 @@
+{
+  "phase_id": "P3",
+  "phase_name": "Service Layer — Business Logic, Singleton & Decorator",
+  "completed_at": "2026-05-20T00:10:00Z",
+  "agent": "ServiceAgent",
+  "subtask_summary": [
+    {
+      "id": "P3-T7a",
+      "status": "done",
+      "notes": "AdminUserService uses Page.map() for idiomatic DTO conversion. @Transactional(readOnly=true) applied at class level. EntityNotFoundException from jakarta.persistence used consistently."
+    },
+    {
+      "id": "P3-T7b",
+      "status": "done",
+      "notes": "AdminPharmacyService implements AdminPharmacyServiceI. updateStatus fetches, sets, saves, publishes AdminActionEvent, then null-checks email before calling NotificationFactory. @Qualifier not needed here since this class is concrete."
+    },
+    {
+      "id": "P3-T7c",
+      "status": "done",
+      "notes": "LoggingAdminPharmacyService is @Primary and injects AdminPharmacyService (concrete) via @Qualifier('adminPharmacyService') to prevent circular dependency. Logs entry and exit for all three methods."
+    },
+    {
+      "id": "P3-T7d",
+      "status": "done",
+      "notes": "AdminDashboardService uses LocalDate.now().atStartOfDay() for prescriptionsToday boundary. treatmentRatePercent guarded against division by zero (defaults to 0.0). Javadoc documents the Singleton pattern."
+    },
+    {
+      "id": "P3-T8",
+      "status": "done",
+      "notes": "GlobalExceptionHandler handles EntityNotFoundException(404), MethodArgumentNotValidException(400 with all field errors joined), AccessDeniedException(403), generic Exception(500 with ERROR log). Unified error envelope matches README section 5.3."
+    }
+  ],
+  "findings": [
+    {
+      "severity": "high",
+      "category": "bug",
+      "description": "LoggingAdminPharmacyService is @Primary and implements AdminPharmacyServiceI. If the delegate was injected as AdminPharmacyServiceI, Spring would inject the @Primary bean (itself) causing a circular dependency at startup.",
+      "file_affected": "src/main/java/com/pharmacy/admin/service/LoggingAdminPharmacyService.java",
+      "resolution": "Delegate is injected as the concrete AdminPharmacyService class with @Qualifier. Spring resolves the concrete bean directly, bypassing the @Primary resolution, eliminating the circular dependency.",
+      "lesson_learned": "When building a Decorator as a @Primary bean, always inject the concrete implementation class (not the interface) to prevent circular injection. Use @Qualifier to be explicit."
+    },
+    {
+      "severity": "medium",
+      "category": "risk",
+      "description": "AdminPharmacyService.updateStatus() calls pharmacyRepository.save() inside a @Transactional method. If the async AuditLogListener fails (e.g., DB constraint), the main transaction is already committed and the audit log is silently lost.",
+      "file_affected": "src/main/java/com/pharmacy/admin/service/AdminPharmacyService.java",
+      "resolution": "The async failure is caught and logged at ERROR level in AuditLogListener (from P2 finding fix). This is an accepted trade-off between availability and consistency for audit logging.",
+      "lesson_learned": "Async audit logging introduces eventual consistency. If audit completeness is critical, consider synchronous logging or an outbox pattern."
+    },
+    {
+      "severity": "low",
+      "category": "design",
+      "description": "AdminDashboardService.treatmentRatePercent uses prescriptionsToday/totalPrescriptions which measures daily volume as a percentage of all-time total. This is the formula specified in the README but may not reflect a meaningful 'treatment rate'.",
+      "file_affected": "src/main/java/com/pharmacy/admin/service/AdminDashboardService.java",
+      "resolution": "Implemented exactly as specified. No deviation from spec.",
+      "lesson_learned": "When implementing analytics metrics, validate the business formula with stakeholders before coding. The formula here comes from the course spec and was followed precisely."
+    }
+  ],
+  "quality_gate_results": {
+    "compile": "pass",
+    "tests": "skipped",
+    "jacoco_instruction": "N/A",
+    "jacoco_branch": "N/A",
+    "newman": "N/A"
+  },
+  "recommendations_for_next_phase": [
+    "P4-APIAgent: JwtAuthenticationFilter must exist in a shared security package before AdminSecurityConfig can reference it — create JwtUtil + JwtAuthenticationFilter in com.pharmacy.shared.security.",
+    "P4-APIAgent: AdminSecurityConfig must disable CSRF (stateless REST API) and set session policy to STATELESS explicitly.",
+    "P4-APIAgent: @AuthenticationPrincipal in AdminPharmacyController depends on the UserDetails implementation returning the User entity ID — verify the principal object exposes getId() or cast to the custom UserDetails class.",
+    "P4-APIAgent: @PreAuthorize requires @EnableMethodSecurity on the security config class — do not forget this annotation."
+  ]
+}
