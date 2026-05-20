@@ -1,9 +1,9 @@
 -- V3: Admin workflow schema
 -- Adds the active flag to pharmacies and creates admin-specific tables.
 
--- Add active flag to shared pharmacies table (IF NOT EXISTS guards re-run safety)
+-- Add active flag to shared pharmacies table
 ALTER TABLE pharmacies
-    ADD COLUMN IF NOT EXISTS active TINYINT(1) NOT NULL DEFAULT 1;
+    ADD COLUMN active TINYINT(1) NOT NULL DEFAULT 1;
 
 -- Admin user association table
 CREATE TABLE IF NOT EXISTS admin_users (
@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS admin_users (
     user_id    BIGINT       NOT NULL UNIQUE,
     created_at DATETIME     DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Audit trail — every admin action persists a row here via the Observer pattern
 CREATE TABLE IF NOT EXISTS audit_logs (
@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     detail      TEXT,
     created_at  DATETIME     DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (admin_id) REFERENCES users(id)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Seed the admin_users record for the seeded admin account (user_id = 1 from V2)
 INSERT IGNORE INTO admin_users (user_id) VALUES (1);

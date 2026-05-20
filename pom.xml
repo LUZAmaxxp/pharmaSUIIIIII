@@ -117,12 +117,6 @@
             <artifactId>h2</artifactId>
             <scope>test</scope>
         </dependency>
-        <!-- Flyway H2 support for tests -->
-        <dependency>
-            <groupId>org.flywaydb</groupId>
-            <artifactId>flyway-core</artifactId>
-            <scope>test</scope>
-        </dependency>
     </dependencies>
 
     <build>

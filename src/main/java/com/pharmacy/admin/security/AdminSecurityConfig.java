@@ -32,6 +32,8 @@ public class AdminSecurityConfig {
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(
+                    "/",
+                    "/index.html",
                     "/api/v1/auth/**",
                     "/swagger-ui/**",
                     "/swagger-ui.html",

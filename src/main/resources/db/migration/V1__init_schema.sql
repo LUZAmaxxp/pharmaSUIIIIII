@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS users (
     password   VARCHAR(255) NOT NULL,
     role       VARCHAR(50)  NOT NULL DEFAULT 'ROLE_PATIENT',
     created_at DATETIME     DEFAULT CURRENT_TIMESTAMP
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS pharmacies (
     id        BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS pharmacies (
     longitude DOUBLE,
     phone     VARCHAR(30),
     email     VARCHAR(255)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS prescriptions (
     id           BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS prescriptions (
     created_at   DATETIME    DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (patient_id)  REFERENCES users(id),
     FOREIGN KEY (pharmacy_id) REFERENCES pharmacies(id)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS orders (
     id            BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -38,4 +38,4 @@ CREATE TABLE IF NOT EXISTS orders (
     created_at    DATETIME    DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (patient_id)  REFERENCES users(id),
     FOREIGN KEY (pharmacy_id) REFERENCES pharmacies(id)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
