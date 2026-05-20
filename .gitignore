@@ -1,0 +1,50 @@
+# ─── Maven build output ───────────────────────────────────────────────────────
+target/
+!.mvn/wrapper/maven-wrapper.jar
+
+# ─── IDE & editor files ───────────────────────────────────────────────────────
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+*.code-workspace
+.classpath
+.project
+.settings/
+*.swp
+*.swo
+
+# ─── Spring Boot / Java ───────────────────────────────────────────────────────
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+hs_err_pid*
+
+# ─── Application secrets & configs ───────────────────────────────────────────
+# Override these locally; never commit real credentials
+src/main/resources/application-prod.properties
+src/main/resources/application-prod.yml
+src/main/resources/application-local.properties
+src/main/resources/application-local.yml
+*.env
+.env
+.env.*
+
+# ─── Logs ─────────────────────────────────────────────────────────────────────
+logs/
+*.log
+*.log.*
+
+# ─── OS generated files ───────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─── JaCoCo / Surefire reports (generated, not source) ───────────────────────
+# (already inside target/, kept here for clarity)
+target/site/
+target/surefire-reports/
+target/jacoco.exec
