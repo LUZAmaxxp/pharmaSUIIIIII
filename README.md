@@ -483,7 +483,7 @@ newman run Admin_Workflow.postman_collection.json \
 | Member | Component | Deliverable |
 |--------|-----------|-------------|
 | **Ayman Allouch** | Entity & DB layer | `AdminUser`, `AuditLog` entities, Flyway migration V3, repositories, repo unit tests |
-| **Sallahedin Hamzi** | Service layer + Observer + Factory | All 3 service classes, `AdminActionEvent`, `AuditLogListener`, `NotificationFactory`, TDD on 2 features |
+| **Salah-eddin Hamzi** | Service layer + Observer + Factory | All 3 service classes, `AdminActionEvent`, `AuditLogListener`, `NotificationFactory`, TDD on 2 features |
 | **Sami Atlagh** | Controller + Security | 3 controllers, `AdminSecurityConfig`, JWT enforcement, `GlobalExceptionHandler` |
 | **Walid Abaaqil** | Tests + Docs | Integration tests, Postman collection, Newman run, JaCoCo report, Swagger annotations |
 
