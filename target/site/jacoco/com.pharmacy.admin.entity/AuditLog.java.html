@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AuditLog.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">pharmacy-admin</a> &gt; <a href="index.source.html" class="el_package">com.pharmacy.admin.entity</a> &gt; <span class="el_source">AuditLog.java</span></div><h1>AuditLog.java</h1><pre class="source lang-java linenums">package com.pharmacy.admin.entity;
+
+import jakarta.persistence.*;
+import org.hibernate.annotations.CreationTimestamp;
+
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = &quot;audit_logs&quot;)
+public class AuditLog {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = &quot;admin_id&quot;, nullable = false)
+    private Long adminId;
+
+    @Column(nullable = false, length = 100)
+    private String action;
+
+    @Column(name = &quot;target_type&quot;, length = 60)
+    private String targetType;
+
+    @Column(name = &quot;target_id&quot;)
+    private Long targetId;
+
+    @Column(columnDefinition = &quot;TEXT&quot;)
+    private String detail;
+
+    @CreationTimestamp
+    @Column(name = &quot;created_at&quot;, updatable = false)
+    private LocalDateTime createdAt;
+
+<span class="fc" id="L35">    public AuditLog() {}</span>
+
+<span class="nc" id="L37">    public Long getId() { return id; }</span>
+<span class="nc" id="L38">    public void setId(Long id) { this.id = id; }</span>
+
+<span class="fc" id="L40">    public Long getAdminId() { return adminId; }</span>
+<span class="fc" id="L41">    public void setAdminId(Long adminId) { this.adminId = adminId; }</span>
+
+<span class="fc" id="L43">    public String getAction() { return action; }</span>
+<span class="fc" id="L44">    public void setAction(String action) { this.action = action; }</span>
+
+<span class="fc" id="L46">    public String getTargetType() { return targetType; }</span>
+<span class="fc" id="L47">    public void setTargetType(String targetType) { this.targetType = targetType; }</span>
+
+<span class="fc" id="L49">    public Long getTargetId() { return targetId; }</span>
+<span class="fc" id="L50">    public void setTargetId(Long targetId) { this.targetId = targetId; }</span>
+
+<span class="fc" id="L52">    public String getDetail() { return detail; }</span>
+<span class="fc" id="L53">    public void setDetail(String detail) { this.detail = detail; }</span>
+
+<span class="nc" id="L55">    public LocalDateTime getCreatedAt() { return createdAt; }</span>
+<span class="nc" id="L56">    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

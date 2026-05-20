@@ -1,0 +1,8 @@
+com\pharmacy\admin\AdminPharmacyControllerTest.class
+com\pharmacy\admin\AdminDashboardServiceTest.class
+com\pharmacy\admin\AuditLogListenerTest.class
+com\pharmacy\admin\AdminPharmacyControllerTest$TestSecurityConfig.class
+com\pharmacy\admin\AdminIntegrationTest.class
+com\pharmacy\admin\AdminPharmacyServiceTest.class
+com\pharmacy\admin\AdminUserServiceTest.class
+com\pharmacy\admin\NotificationFactoryTest.class

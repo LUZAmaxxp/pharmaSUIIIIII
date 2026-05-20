@@ -1,0 +1,62 @@
+{
+  "phase_id": "P2",
+  "phase_name": "Domain Layer — DTOs & Design Patterns",
+  "completed_at": "2026-05-20T00:05:00Z",
+  "agent": "DomainAgent",
+  "subtask_summary": [
+    {
+      "id": "P2-T4",
+      "status": "done",
+      "notes": "UserSummaryDTO, PharmacySummaryDTO, DashboardStatsDTO implemented as Java records. PharmacyStatusUpdateDTO implemented as a regular class with @NotNull on Boolean active field."
+    },
+    {
+      "id": "P2-T5",
+      "status": "done",
+      "notes": "AdminActionEvent extends ApplicationEvent; constructor calls super(source). AuditLogListener uses @EventListener + @Async with a try/catch to prevent async exception swallowing. @EnableAsync already on main class."
+    },
+    {
+      "id": "P2-T6",
+      "status": "done",
+      "notes": "NotificationFactory is a utility class with private constructor. Null guards added for recipient and message. Factory correctly delegates to EmailNotification or SmsNotification."
+    }
+  ],
+  "findings": [
+    {
+      "severity": "medium",
+      "category": "bug",
+      "description": "AuditLogListener @Async methods can silently swallow exceptions by default if no AsyncUncaughtExceptionHandler is configured. This would cause missed audit log entries with no visible error.",
+      "file_affected": "src/main/java/com/pharmacy/admin/observer/AuditLogListener.java",
+      "resolution": "Wrapped the body of handle() in a try/catch that logs at ERROR level. This ensures failures are visible in logs even if not re-thrown.",
+      "lesson_learned": "Always wrap @Async method bodies in try/catch or register an AsyncUncaughtExceptionHandler bean to surface async failures."
+    },
+    {
+      "severity": "medium",
+      "category": "risk",
+      "description": "NotificationFactory received null recipient when pharmacy.getEmail() returns null (email column is nullable in the DB schema). This would throw IllegalArgumentException from the factory.",
+      "file_affected": "src/main/java/com/pharmacy/admin/factory/NotificationFactory.java",
+      "resolution": "Added null guard in NotificationFactory.createNotification() that throws IllegalArgumentException with a clear message. The service layer must null-check pharmacy email before calling the factory.",
+      "lesson_learned": "Validate inputs at factory boundary to provide clear error messages. The service caller must guard against null email in pharmacy data."
+    },
+    {
+      "severity": "low",
+      "category": "design",
+      "description": "PharmacyStatusUpdateDTO uses Boolean (boxed) not boolean (primitive) to allow @NotNull validation to distinguish 'not provided' from 'false'. Using primitive boolean would make null impossible to detect.",
+      "file_affected": "src/main/java/com/pharmacy/admin/dto/PharmacyStatusUpdateDTO.java",
+      "resolution": "Kept Boolean (boxed) as the field type. This is the correct approach for optional request body fields that must be present.",
+      "lesson_learned": "Always use boxed types (Boolean, Integer, etc.) for DTO fields that require @NotNull validation. Primitive types cannot be null and @NotNull has no effect on them."
+    }
+  ],
+  "quality_gate_results": {
+    "compile": "pass",
+    "tests": "skipped",
+    "jacoco_instruction": "N/A",
+    "jacoco_branch": "N/A",
+    "newman": "N/A"
+  },
+  "recommendations_for_next_phase": [
+    "P3-ServiceAgent: LoggingAdminPharmacyService must inject AdminPharmacyService (concrete class) not AdminPharmacyServiceI (interface) to avoid Spring circular bean dependency since LoggingAdminPharmacyService is @Primary.",
+    "P3-ServiceAgent: AdminDashboardService.getStats() must handle totalPrescriptions=0 to avoid division by zero in treatmentRatePercent calculation.",
+    "P3-ServiceAgent: AdminPharmacyService.updateStatus() must null-check pharmacy.getEmail() before calling NotificationFactory — per the finding in this phase.",
+    "P3-ServiceAgent: EntityNotFoundException should be from jakarta.persistence.EntityNotFoundException or a custom exception class — pick one and use consistently across all services."
+  ]
+}

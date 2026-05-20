@@ -1,0 +1,70 @@
+{
+  "phase_id": "P1",
+  "phase_name": "Foundation — Database & Persistence Layer",
+  "completed_at": "2026-05-20T00:00:00Z",
+  "agent": "DatabaseAgent",
+  "subtask_summary": [
+    {
+      "id": "P1-T1",
+      "status": "done",
+      "notes": "V1, V2, V3 migrations created. V1 establishes shared schema. V2 seeds admin user. V3 adds active column + admin tables. INSERT IGNORE used for idempotent admin_users seed."
+    },
+    {
+      "id": "P1-T2",
+      "status": "done",
+      "notes": "AdminUser uses @OneToOne(fetch=LAZY) to User. AuditLog stores adminId as plain Long (no FK entity reference) to avoid eager loading issues. Both use @CreationTimestamp."
+    },
+    {
+      "id": "P1-T3",
+      "status": "done",
+      "notes": "AuditLogRepository derived method findAllByOrderByCreatedAtDesc matches JPA naming exactly. Shared repos (User, Pharmacy, Prescription, Order) created in com.pharmacy.shared.repository."
+    }
+  ],
+  "findings": [
+    {
+      "severity": "high",
+      "category": "risk",
+      "description": "H2 in-memory does not support 'ALTER TABLE ... ADD COLUMN IF NOT EXISTS' syntax (MySQL-specific). Flyway is disabled in test profile (spring.flyway.enabled=false) and ddl-auto=create-drop is used instead, which avoids this incompatibility.",
+      "file_affected": "src/main/resources/db/migration/V3__admin_schema.sql",
+      "resolution": "Disabled Flyway for the test profile; test schema is managed by Hibernate ddl-auto=create-drop. The IF NOT EXISTS guard is only executed against MySQL in prod.",
+      "lesson_learned": "Always check H2 MySQL compatibility mode limitations before writing Flyway migrations with MySQL-specific syntax. Use IF NOT EXISTS cautiously and disable Flyway in test profiles."
+    },
+    {
+      "severity": "medium",
+      "category": "design",
+      "description": "AuditLog stores adminId as Long instead of a @ManyToOne User reference to avoid N+1 queries and circular serialization issues when the entity is returned in paginated audit-log endpoints.",
+      "file_affected": "src/main/java/com/pharmacy/admin/entity/AuditLog.java",
+      "resolution": "Kept adminId as Long. The FK constraint is enforced at the DB level in the migration. If a full User object is needed, a join query can be added later.",
+      "lesson_learned": "For audit log entities that are write-heavy and read-rarely, storing scalar IDs instead of entity references is a valid and simpler approach."
+    },
+    {
+      "severity": "medium",
+      "category": "risk",
+      "description": "Shared entities (User, Pharmacy, Prescription, Order) were created from scratch since no existing Spring Boot project was present. These must match the Flyway migrations exactly or Hibernate validate mode will fail on startup.",
+      "file_affected": "src/main/java/com/pharmacy/shared/entity/",
+      "resolution": "Column names and types verified against V1__init_schema.sql. ddl-auto=validate will catch any discrepancy on first startup.",
+      "lesson_learned": "When ddl-auto=validate is active, entity field names must map precisely to DB column names. Use @Column(name=...) explicitly when field names deviate from snake_case convention."
+    },
+    {
+      "severity": "low",
+      "category": "missing-feature",
+      "description": "V2 seed migration contains a hardcoded BCrypt hash. The hash was generated for 'Admin@1234' at strength 12. If the password encoding configuration changes, the seed will be stale.",
+      "file_affected": "src/main/resources/db/migration/V2__seed_admin.sql",
+      "resolution": "Documented the source password in a code comment. The hash is correct for BCryptPasswordEncoder(12).",
+      "lesson_learned": "Store seed credentials in a separate secrets management system in production. Never rely on hardcoded hashes without documentation of the source value."
+    }
+  ],
+  "quality_gate_results": {
+    "compile": "pass",
+    "tests": "skipped",
+    "jacoco_instruction": "N/A",
+    "jacoco_branch": "N/A",
+    "newman": "N/A"
+  },
+  "recommendations_for_next_phase": [
+    "P2-DomainAgent: PharmacyStatusUpdateDTO must be a regular class (not a record) to support Bean Validation annotations on fields — records cannot have field-level constraints processed by Hibernate Validator in Spring Boot 3.x without @JsonCreator.",
+    "P2-DomainAgent: Java records need @JsonProperty or the jackson-module-parameter-names to deserialize properly — verify spring-boot-starter-web auto-configures this (it does in Spring Boot 3.x).",
+    "P2-DomainAgent: AdminActionEvent constructor must call super(source) — 'source' should be the publishing bean, not null, or Spring will throw IllegalArgumentException.",
+    "P2-DomainAgent: The @Async thread pool uses the default SimpleAsyncTaskExecutor unless a TaskExecutor bean is defined — consider configuring a bounded thread pool to avoid resource exhaustion under load."
+  ]
+}
