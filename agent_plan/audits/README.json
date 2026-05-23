@@ -1,0 +1,11 @@
+{
+  "_comment": "Audit reports are written here by each agent at the end of its phase. Files follow the naming convention phase_N_audit.json.",
+  "expected_files": [
+    "phase_1_audit.json",
+    "phase_2_audit.json",
+    "phase_3_audit.json",
+    "phase_4_audit.json",
+    "phase_5_audit.json"
+  ],
+  "schema_reference": "See agent_plan/implementation_plan.json → audit_file_schema for the required structure each agent must produce."
+}

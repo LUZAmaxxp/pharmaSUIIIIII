@@ -1,0 +1,187 @@
+{
+  "info": {
+    "_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "name": "Admin Workflow — INF4121",
+    "description": "Pharmacie en Ligne — Admin Workflow test suite. Pre-request script auto-logs in and stores JWT.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl",        "value": "http://localhost:8080" },
+    { "key": "adminEmail",     "value": "admin@pharmacy.ma" },
+    { "key": "adminPassword",  "value": "Admin@1234" },
+    { "key": "token",          "value": "" }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Auto-login: fetch JWT and store in collection variable",
+          "const loginUrl = pm.collectionVariables.get('baseUrl') + '/api/v1/auth/login';",
+          "pm.sendRequest({",
+          "    url: loginUrl,",
+          "    method: 'POST',",
+          "    header: { 'Content-Type': 'application/json' },",
+          "    body: {",
+          "        mode: 'raw',",
+          "        raw: JSON.stringify({",
+          "            email:    pm.collectionVariables.get('adminEmail'),",
+          "            password: pm.collectionVariables.get('adminPassword')",
+          "        })",
+          "    }",
+          "}, function (err, res) {",
+          "    if (!err && res.code === 200) {",
+          "        pm.collectionVariables.set('token', res.json().token);",
+          "    }",
+          "});"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "1. GET All Users",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/v1/admin/users",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+      },
+      "event": [{
+        "listen": "test",
+        "script": {
+          "exec": [
+            "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+            "pm.test('Content is array', () => {",
+            "    const body = pm.response.json();",
+            "    pm.expect(body.content).to.be.an('array');",
+            "});"
+          ]
+        }
+      }]
+    },
+    {
+      "name": "2. GET User by ID",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/v1/admin/users/1",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+      },
+      "event": [{
+        "listen": "test",
+        "script": {
+          "exec": [
+            "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+            "pm.test('Response has id', () => {",
+            "    const body = pm.response.json();",
+            "    pm.expect(body.id).to.exist;",
+            "});"
+          ]
+        }
+      }]
+    },
+    {
+      "name": "3. GET All Pharmacies",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/v1/admin/pharmacies",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+      },
+      "event": [{
+        "listen": "test",
+        "script": {
+          "exec": [
+            "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+            "pm.test('Content is array', () => {",
+            "    const body = pm.response.json();",
+            "    pm.expect(body.content).to.be.an('array');",
+            "});"
+          ]
+        }
+      }]
+    },
+    {
+      "name": "4. PATCH Deactivate Pharmacy",
+      "request": {
+        "method": "PATCH",
+        "url": "{{baseUrl}}/api/v1/admin/pharmacies/1/status",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Content-Type",  "value": "application/json" }
+        ],
+        "body": { "mode": "raw", "raw": "{\"active\":false}" }
+      },
+      "event": [{
+        "listen": "test",
+        "script": {
+          "exec": [
+            "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+            "pm.test('active is false', () => {",
+            "    const body = pm.response.json();",
+            "    pm.expect(body.active).to.be.false;",
+            "});"
+          ]
+        }
+      }]
+    },
+    {
+      "name": "5. PATCH Reactivate Pharmacy",
+      "request": {
+        "method": "PATCH",
+        "url": "{{baseUrl}}/api/v1/admin/pharmacies/1/status",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Content-Type",  "value": "application/json" }
+        ],
+        "body": { "mode": "raw", "raw": "{\"active\":true}" }
+      },
+      "event": [{
+        "listen": "test",
+        "script": {
+          "exec": [
+            "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+            "pm.test('active is true', () => {",
+            "    const body = pm.response.json();",
+            "    pm.expect(body.active).to.be.true;",
+            "});"
+          ]
+        }
+      }]
+    },
+    {
+      "name": "6. GET Dashboard",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/v1/admin/dashboard",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+      },
+      "event": [{
+        "listen": "test",
+        "script": {
+          "exec": [
+            "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+            "pm.test('treatmentRatePercent is a number', () => {",
+            "    const body = pm.response.json();",
+            "    pm.expect(body.treatmentRatePercent).to.be.a('number');",
+            "});"
+          ]
+        }
+      }]
+    },
+    {
+      "name": "7. GET Users — No Auth (expect 403)",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/v1/admin/users"
+      },
+      "event": [{
+        "listen": "test",
+        "script": {
+          "exec": [
+            "pm.test('Status is 403 without auth', () => pm.response.to.have.status(403));"
+          ]
+        }
+      }]
+    }
+  ]
+}

@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>PharmAdmin — Admin Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: { DEFAULT: '#0d9488', dark: '#0f766e', light: '#99f6e4', lighter: '#f0fdfa' }
+          }
+        }
+      }
+    }
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    .sidebar-link.active {
+      background: rgba(13,148,136,0.1);
+      color: #0d9488;
+      border-right: 3px solid #0d9488;
+    }
+    .sidebar-link.active svg { opacity: 1; }
+  </style>
+</head>
+<body class="bg-gray-50 font-sans antialiased">
+
+<!-- ═══════════════════════════ LOGIN SCREEN ═══════════════════════════ -->
+<div id="login-screen" class="min-h-screen flex items-center justify-center bg-gradient-to-br from-teal-700 to-teal-900 p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
+    <div class="flex flex-col items-center mb-8">
+      <div class="w-16 h-16 bg-teal-600 rounded-2xl flex items-center justify-center mb-4 shadow-lg">
+        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+        </svg>
+      </div>
+      <h1 class="text-2xl font-bold text-gray-800">PharmAdmin</h1>
+      <p class="text-sm text-gray-500 mt-1">Pharmacy Management Dashboard</p>
+    </div>
+
+    <div id="login-error" class="hidden mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center gap-2">
+      <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      <span id="login-error-msg"></span>
+    </div>
+
+    <form id="login-form" class="space-y-5">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1.5">Email address</label>
+        <input id="login-email" type="email" required autocomplete="email"
+               class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition text-sm"
+               placeholder="admin@pharmacy.ma"/>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
+        <input id="login-password" type="password" required autocomplete="current-password"
+               class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition text-sm"
+               placeholder="••••••••"/>
+      </div>
+      <button type="submit" id="login-btn"
+              class="w-full bg-teal-600 hover:bg-teal-700 disabled:opacity-60 text-white font-semibold py-2.5 rounded-lg transition flex items-center justify-center gap-2">
+        <span>Sign in</span>
+        <svg id="login-spinner" class="hidden animate-spin w-4 h-4 text-white" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+        </svg>
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ APP SHELL ═══════════════════════════ -->
+<div id="app" class="hidden min-h-screen flex">
+
+  <!-- ── Sidebar ── -->
+  <aside class="w-64 bg-white border-r border-gray-200 flex flex-col fixed inset-y-0 left-0 z-20 shadow-sm">
+    <!-- Logo -->
+    <div class="h-16 flex items-center px-6 border-b border-gray-100">
+      <div class="w-9 h-9 bg-teal-600 rounded-xl flex items-center justify-center mr-3 shrink-0 shadow">
+        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+        </svg>
+      </div>
+      <div>
+        <p class="font-bold text-gray-800 leading-tight">PharmAdmin</p>
+        <p class="text-xs text-gray-400">Admin Panel</p>
+      </div>
+    </div>
+
+    <!-- Nav links -->
+    <nav class="flex-1 px-3 py-5 space-y-1 overflow-y-auto">
+      <p class="px-3 text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-2">Main</p>
+
+      <a href="#" data-page="dashboard"
+         class="sidebar-link active flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-800 transition">
+        <svg class="w-5 h-5 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+        </svg>
+        Dashboard
+      </a>
+
+      <a href="#" data-page="pharmacies"
+         class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-800 transition">
+        <svg class="w-5 h-5 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+        </svg>
+        Pharmacies
+      </a>
+
+      <a href="#" data-page="users"
+         class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-800 transition">
+        <svg class="w-5 h-5 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+        Users
+      </a>
+    </nav>
+
+    <!-- User / Logout -->
+    <div class="p-4 border-t border-gray-100">
+      <div class="flex items-center gap-2 mb-3 px-1">
+        <div class="w-8 h-8 bg-teal-100 rounded-full flex items-center justify-center shrink-0">
+          <svg class="w-4 h-4 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+          </svg>
+        </div>
+        <div class="min-w-0">
+          <p id="user-info" class="text-xs font-medium text-gray-700 truncate"></p>
+          <p class="text-[10px] text-gray-400">Administrator</p>
+        </div>
+      </div>
+      <button id="logout-btn"
+              class="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-500 hover:bg-red-50 rounded-lg transition font-medium">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+        </svg>
+        Sign out
+      </button>
+    </div>
+  </aside>
+
+  <!-- ── Main Content ── -->
+  <main class="ml-64 flex-1 flex flex-col">
+    <!-- Top Bar -->
+    <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-8 sticky top-0 z-10">
+      <h2 id="page-title" class="text-lg font-semibold text-gray-800">Dashboard</h2>
+      <div class="flex items-center gap-3">
+        <span class="text-xs bg-teal-50 text-teal-700 border border-teal-200 rounded-full px-3 py-1 font-semibold tracking-wide">ADMIN</span>
+      </div>
+    </header>
+
+    <div class="flex-1 p-8">
+
+      <!-- ════════════ DASHBOARD PAGE ════════════ -->
+      <div id="page-dashboard">
+        <!-- KPI Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5 mb-8">
+          <!-- Card template (6 cards) -->
+          <div class="bg-white rounded-xl border border-gray-200 p-6 flex items-center gap-4 hover:shadow-sm transition">
+            <div class="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center shrink-0">
+              <svg class="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+              </svg>
+            </div>
+            <div>
+              <p class="text-xs text-gray-500 font-medium uppercase tracking-wide">Total Users</p>
+              <p class="text-2xl font-bold text-gray-800 mt-0.5" id="stat-totalUsers">
+                <span class="inline-block w-16 h-6 bg-gray-100 rounded animate-pulse"></span>
+              </p>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-xl border border-gray-200 p-6 flex items-center gap-4 hover:shadow-sm transition">
+            <div class="w-12 h-12 bg-teal-50 rounded-xl flex items-center justify-center shrink-0">
+              <svg class="w-6 h-6 text-teal-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+              </svg>
+            </div>
+            <div>
+              <p class="text-xs text-gray-500 font-medium uppercase tracking-wide">Total Pharmacies</p>
+              <p class="text-2xl font-bold text-gray-800 mt-0.5" id="stat-totalPharmacies">
+                <span class="inline-block w-16 h-6 bg-gray-100 rounded animate-pulse"></span>
+              </p>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-xl border border-gray-200 p-6 flex items-center gap-4 hover:shadow-sm transition">
+            <div class="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center shrink-0">
+              <svg class="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+            </div>
+            <div>
+              <p class="text-xs text-gray-500 font-medium uppercase tracking-wide">Active Pharmacies</p>
+              <p class="text-2xl font-bold text-gray-800 mt-0.5" id="stat-activePharmacies">
+                <span class="inline-block w-16 h-6 bg-gray-100 rounded animate-pulse"></span>
+              </p>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-xl border border-gray-200 p-6 flex items-center gap-4 hover:shadow-sm transition">
+            <div class="w-12 h-12 bg-purple-50 rounded-xl flex items-center justify-center shrink-0">
+              <svg class="w-6 h-6 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
+              </svg>
+            </div>
+            <div>
+              <p class="text-xs text-gray-500 font-medium uppercase tracking-wide">Total Prescriptions</p>
+              <p class="text-2xl font-bold text-gray-800 mt-0.5" id="stat-totalPrescriptions">
+                <span class="inline-block w-16 h-6 bg-gray-100 rounded animate-pulse"></span>
+              </p>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-xl border border-gray-200 p-6 flex items-center gap-4 hover:shadow-sm transition">
+            <div class="w-12 h-12 bg-orange-50 rounded-xl flex items-center justify-center shrink-0">
+              <svg class="w-6 h-6 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+              </svg>
+            </div>
+            <div>
+              <p class="text-xs text-gray-500 font-medium uppercase tracking-wide">Prescriptions Today</p>
+              <p class="text-2xl font-bold text-gray-800 mt-0.5" id="stat-prescriptionsToday">
+                <span class="inline-block w-16 h-6 bg-gray-100 rounded animate-pulse"></span>
+              </p>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-xl border border-gray-200 p-6 flex items-center gap-4 hover:shadow-sm transition">
+            <div class="w-12 h-12 bg-pink-50 rounded-xl flex items-center justify-center shrink-0">
+              <svg class="w-6 h-6 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+              </svg>
+            </div>
+            <div>
+              <p class="text-xs text-gray-500 font-medium uppercase tracking-wide">Treatment Rate</p>
+              <p class="text-2xl font-bold text-gray-800 mt-0.5" id="stat-treatmentRate">
+                <span class="inline-block w-16 h-6 bg-gray-100 rounded animate-pulse"></span>
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chart -->
+        <div class="bg-white rounded-xl border border-gray-200 p-6">
+          <div class="flex items-center justify-between mb-6">
+            <h3 class="text-sm font-semibold text-gray-700">Pharmacy Overview</h3>
+            <span class="text-xs text-gray-400">Live data</span>
+          </div>
+          <canvas id="dashboard-chart" height="90"></canvas>
+        </div>
+      </div>
+
+      <!-- ════════════ PHARMACIES PAGE ════════════ -->
+      <div id="page-pharmacies" class="hidden">
+        <div class="bg-white rounded-xl border border-gray-200">
+          <div class="flex items-center justify-between px-6 py-5 border-b border-gray-100">
+            <h3 class="font-semibold text-gray-800">All Pharmacies</h3>
+            <span id="pharmacies-count" class="text-sm text-gray-400"></span>
+          </div>
+
+          <!-- Loading -->
+          <div id="pharmacies-loading" class="py-16 flex flex-col items-center gap-3 text-gray-400">
+            <svg class="animate-spin w-7 h-7 text-teal-400" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+            </svg>
+            <span class="text-sm">Loading pharmacies…</span>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b border-gray-100 bg-gray-50/60">
+                  <th class="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">ID</th>
+                  <th class="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Name</th>
+                  <th class="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Address</th>
+                  <th class="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Coordinates</th>
+                  <th class="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                  <th class="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Action</th>
+                </tr>
+              </thead>
+              <tbody id="pharmacies-tbody" class="divide-y divide-gray-50"></tbody>
+            </table>
+          </div>
+
+          <!-- Pagination -->
+          <div class="flex items-center justify-between px-6 py-4 border-t border-gray-100">
+            <button id="pharmacies-prev" onclick="changePage('pharmacies',-1)"
+                    class="inline-flex items-center gap-1.5 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition font-medium text-gray-600">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+              </svg>
+              Previous
+            </button>
+            <span id="pharmacies-page-info" class="text-sm text-gray-400"></span>
+            <button id="pharmacies-next" onclick="changePage('pharmacies',1)"
+                    class="inline-flex items-center gap-1.5 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition font-medium text-gray-600">
+              Next
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════════════ USERS PAGE ════════════ -->
+      <div id="page-users" class="hidden">
+        <div class="bg-white rounded-xl border border-gray-200">
+          <div class="flex items-center justify-between px-6 py-5 border-b border-gray-100">
+            <h3 class="font-semibold text-gray-800">All Users</h3>
+            <span id="users-count" class="text-sm text-gray-400"></span>
+          </div>
+
+          <!-- Loading -->
+          <div id="users-loading" class="py-16 flex flex-col items-center gap-3 text-gray-400">
+            <svg class="animate-spin w-7 h-7 text-teal-400" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+            </svg>
+            <span class="text-sm">Loading users…</span>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b border-gray-100 bg-gray-50/60">
+                  <th class="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">ID</th>
+                  <th class="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Email</th>
+                  <th class="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Role</th>
+                  <th class="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Created At</th>
+                </tr>
+              </thead>
+              <tbody id="users-tbody" class="divide-y divide-gray-50"></tbody>
+            </table>
+          </div>
+
+          <div class="flex items-center justify-between px-6 py-4 border-t border-gray-100">
+            <button id="users-prev" onclick="changePage('users',-1)"
+                    class="inline-flex items-center gap-1.5 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition font-medium text-gray-600">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+              </svg>
+              Previous
+            </button>
+            <span id="users-page-info" class="text-sm text-gray-400"></span>
+            <button id="users-next" onclick="changePage('users',1)"
+                    class="inline-flex items-center gap-1.5 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition font-medium text-gray-600">
+              Next
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /p-8 -->
+  </main>
+</div><!-- /app -->
+
+<!-- ═══════════════════════════ JAVASCRIPT ═══════════════════════════ -->
+<script>
+  const API = '/api/v1';
+  let token = localStorage.getItem('pharma_token');
+  let dashChart = null;
+  const pagination = {
+    pharmacies: { current: 0, total: 0 },
+    users:      { current: 0, total: 0 }
+  };
+
+  /* ─── Auth helpers ─── */
+  function authHeaders() {
+    return { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
+  }
+
+  async function apiFetch(path, opts = {}) {
+    const res = await fetch(API + path, { headers: authHeaders(), ...opts });
+    if (res.status === 401 || res.status === 403) { logout(); return null; }
+    return res;
+  }
+
+  /* ─── App shell ─── */
+  function showApp() {
+    document.getElementById('login-screen').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      document.getElementById('user-info').textContent = payload.sub || 'Admin';
+    } catch { document.getElementById('user-info').textContent = 'Admin'; }
+    navigateTo('dashboard');
+  }
+
+  function logout() {
+    token = null;
+    localStorage.removeItem('pharma_token');
+    document.getElementById('app').classList.add('hidden');
+    document.getElementById('login-screen').classList.remove('hidden');
+    document.getElementById('login-password').value = '';
+  }
+
+  function navigateTo(page) {
+    // Sidebar active state
+    document.querySelectorAll('.sidebar-link').forEach(l => {
+      l.classList.toggle('active', l.dataset.page === page);
+    });
+    // Show/hide pages
+    ['dashboard', 'pharmacies', 'users'].forEach(p => {
+      document.getElementById('page-' + p).classList.toggle('hidden', p !== page);
+    });
+    // Header title
+    document.getElementById('page-title').textContent =
+      { dashboard: 'Dashboard', pharmacies: 'Pharmacies', users: 'Users' }[page];
+    // Load data
+    if (page === 'dashboard')   loadDashboard();
+    if (page === 'pharmacies')  loadPharmacies(0);
+    if (page === 'users')       loadUsers(0);
+  }
+
+  /* ─── Login ─── */
+  document.getElementById('login-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const errEl  = document.getElementById('login-error');
+    const errMsg = document.getElementById('login-error-msg');
+    const btn    = document.getElementById('login-btn');
+    const spin   = document.getElementById('login-spinner');
+
+    errEl.classList.add('hidden');
+    btn.disabled = true;
+    spin.classList.remove('hidden');
+
+    try {
+      const res = await fetch(API + '/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email:    document.getElementById('login-email').value.trim(),
+          password: document.getElementById('login-password').value
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        token = data.token;
+        localStorage.setItem('pharma_token', token);
+        showApp();
+      } else {
+        errMsg.textContent = res.status === 401
+          ? 'Invalid email or password.'
+          : 'Login failed. Please try again.';
+        errEl.classList.remove('hidden');
+      }
+    } catch {
+      errMsg.textContent = 'Cannot reach server. Make sure the application is running.';
+      errEl.classList.remove('hidden');
+    } finally {
+      btn.disabled = false;
+      spin.classList.add('hidden');
+    }
+  });
+
+  document.getElementById('logout-btn').addEventListener('click', logout);
+
+  document.querySelectorAll('.sidebar-link').forEach(l =>
+    l.addEventListener('click', e => { e.preventDefault(); navigateTo(l.dataset.page); })
+  );
+
+  /* ─── Dashboard ─── */
+  async function loadDashboard() {
+    const res = await apiFetch('/admin/dashboard');
+    if (!res || !res.ok) return;
+    const d = await res.json();
+
+    document.getElementById('stat-totalUsers').textContent        = d.totalUsers.toLocaleString();
+    document.getElementById('stat-totalPharmacies').textContent   = d.totalPharmacies.toLocaleString();
+    document.getElementById('stat-activePharmacies').textContent  = d.activePharmacies.toLocaleString();
+    document.getElementById('stat-totalPrescriptions').textContent = d.totalPrescriptions.toLocaleString();
+    document.getElementById('stat-prescriptionsToday').textContent = d.prescriptionsToday.toLocaleString();
+    document.getElementById('stat-treatmentRate').textContent     = d.treatmentRatePercent.toFixed(1) + '%';
+
+    renderChart(d);
+  }
+
+  function renderChart(d) {
+    const ctx = document.getElementById('dashboard-chart').getContext('2d');
+    if (dashChart) dashChart.destroy();
+    dashChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: ['Total Users', 'Total Pharmacies', 'Active Pharmacies', 'Prescriptions Today', 'Total Prescriptions'],
+        datasets: [{
+          label: 'Count',
+          data: [d.totalUsers, d.totalPharmacies, d.activePharmacies, d.prescriptionsToday, d.totalPrescriptions],
+          backgroundColor: ['#3b82f6', '#0d9488', '#22c55e', '#f97316', '#a855f7'],
+          borderRadius: 8,
+          borderSkipped: false
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: ctx => ' ' + ctx.parsed.y.toLocaleString() } }
+        },
+        scales: {
+          y: { beginAtZero: true, grid: { color: '#f3f4f6' }, ticks: { precision: 0 } },
+          x: { grid: { display: false } }
+        }
+      }
+    });
+  }
+
+  /* ─── Pharmacies ─── */
+  async function loadPharmacies(page) {
+    const loadEl = document.getElementById('pharmacies-loading');
+    const tbody  = document.getElementById('pharmacies-tbody');
+    loadEl.classList.remove('hidden');
+    tbody.innerHTML = '';
+
+    const res = await apiFetch(`/admin/pharmacies?page=${page}&size=10`);
+    if (!res || !res.ok) { loadEl.classList.add('hidden'); return; }
+    const data = await res.json();
+
+    pagination.pharmacies.current = data.number;
+    pagination.pharmacies.total   = data.totalPages;
+
+    document.getElementById('pharmacies-count').textContent =
+      `${data.totalElements.toLocaleString()} total`;
+    document.getElementById('pharmacies-page-info').textContent =
+      `Page ${data.number + 1} of ${Math.max(data.totalPages, 1)}`;
+    document.getElementById('pharmacies-prev').disabled = data.first;
+    document.getElementById('pharmacies-next').disabled = data.last;
+
+    tbody.innerHTML = data.content.length === 0
+      ? `<tr><td colspan="6" class="px-6 py-12 text-center text-gray-400 text-sm">No pharmacies found.</td></tr>`
+      : data.content.map(p => `
+        <tr class="hover:bg-gray-50/80 transition">
+          <td class="px-6 py-4 text-gray-400 font-mono text-xs">#${p.id}</td>
+          <td class="px-6 py-4 font-medium text-gray-800">${esc(p.name)}</td>
+          <td class="px-6 py-4 text-gray-500">${esc(p.address)}</td>
+          <td class="px-6 py-4 text-gray-400 font-mono text-xs">
+            ${p.latitude != null ? p.latitude.toFixed(4) + ', ' + p.longitude.toFixed(4) : '—'}
+          </td>
+          <td class="px-6 py-4">
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold
+              ${p.active ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}">
+              <span class="w-1.5 h-1.5 rounded-full ${p.active ? 'bg-green-500' : 'bg-gray-400'}"></span>
+              ${p.active ? 'Active' : 'Inactive'}
+            </span>
+          </td>
+          <td class="px-6 py-4">
+            <button onclick="togglePharmacy(${p.id}, ${p.active})"
+                    class="px-3 py-1.5 text-xs font-semibold rounded-lg border transition
+                      ${p.active
+                        ? 'border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300'
+                        : 'border-teal-200 text-teal-600 hover:bg-teal-50 hover:border-teal-300'}">
+              ${p.active ? 'Deactivate' : 'Activate'}
+            </button>
+          </td>
+        </tr>`).join('');
+
+    loadEl.classList.add('hidden');
+  }
+
+  async function togglePharmacy(id, currentActive) {
+    const res = await apiFetch(`/admin/pharmacies/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ active: !currentActive })
+    });
+    if (res && res.ok) loadPharmacies(pagination.pharmacies.current);
+  }
+
+  /* ─── Users ─── */
+  async function loadUsers(page) {
+    const loadEl = document.getElementById('users-loading');
+    const tbody  = document.getElementById('users-tbody');
+    loadEl.classList.remove('hidden');
+    tbody.innerHTML = '';
+
+    const res = await apiFetch(`/admin/users?page=${page}&size=10`);
+    if (!res || !res.ok) { loadEl.classList.add('hidden'); return; }
+    const data = await res.json();
+
+    pagination.users.current = data.number;
+    pagination.users.total   = data.totalPages;
+
+    document.getElementById('users-count').textContent =
+      `${data.totalElements.toLocaleString()} total`;
+    document.getElementById('users-page-info').textContent =
+      `Page ${data.number + 1} of ${Math.max(data.totalPages, 1)}`;
+    document.getElementById('users-prev').disabled = data.first;
+    document.getElementById('users-next').disabled = data.last;
+
+    const roleStyle = {
+      ADMIN:      'bg-purple-50 text-purple-700 border border-purple-200',
+      PATIENT:    'bg-blue-50 text-blue-700 border border-blue-200',
+      PHARMACIST: 'bg-teal-50 text-teal-700 border border-teal-200'
+    };
+
+    tbody.innerHTML = data.content.length === 0
+      ? `<tr><td colspan="4" class="px-6 py-12 text-center text-gray-400 text-sm">No users found.</td></tr>`
+      : data.content.map(u => `
+        <tr class="hover:bg-gray-50/80 transition">
+          <td class="px-6 py-4 text-gray-400 font-mono text-xs">#${u.id}</td>
+          <td class="px-6 py-4 font-medium text-gray-800">${esc(u.email)}</td>
+          <td class="px-6 py-4">
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold
+              ${roleStyle[u.role] || 'bg-gray-100 text-gray-600 border border-gray-200'}">
+              ${esc(u.role)}
+            </span>
+          </td>
+          <td class="px-6 py-4 text-gray-500 text-xs">${fmtDate(u.createdAt)}</td>
+        </tr>`).join('');
+
+    loadEl.classList.add('hidden');
+  }
+
+  /* ─── Pagination ─── */
+  function changePage(section, delta) {
+    const p = pagination[section];
+    const next = p.current + delta;
+    if (next < 0 || next >= p.total) return;
+    if (section === 'pharmacies') loadPharmacies(next);
+    else loadUsers(next);
+  }
+
+  /* ─── Utilities ─── */
+  function esc(s) {
+    return String(s ?? '')
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function fmtDate(iso) {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' });
+  }
+
+  /* ─── Init ─── */
+  if (token) showApp();
+</script>
+</body>
+</html>

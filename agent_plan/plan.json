@@ -1,0 +1,272 @@
+{
+  "meta": {
+    "project": "Pharmacie en Ligne — INF4121 Printemps 2026",
+    "workflow": "Admin Workflow",
+    "team": ["Ayman Allouch", "Sallahedin Hamzi", "Sami Atlagh", "Walid Abaaqil"],
+    "stack": {
+      "language": "Java 17+",
+      "framework": "Spring Boot 3.x",
+      "orm": "Spring Data JPA / Hibernate",
+      "database_prod": "MySQL 8+",
+      "database_test": "H2 in-memory",
+      "security": "Spring Security + JWT (jjwt 0.11.5)",
+      "docs": "springdoc-openapi 2.3.0 (Swagger UI)",
+      "build": "Maven",
+      "coverage": "JaCoCo 0.8.11",
+      "api_tests": "Postman + Newman"
+    }
+  },
+  "system_prompt": "You are an expert Java Spring Boot engineer. You will implement the ADMIN WORKFLOW for an online pharmacy application. Follow every instruction precisely. Generate complete, compilable, production-quality code. Apply SOLID principles and the four design patterns listed below. Do not generate placeholder stubs — write full implementations. After each file, print a one-line summary: [DONE] <ClassName>.",
+
+  "context": {
+    "base_package": "com.pharmacy",
+    "admin_package": "com.pharmacy.admin",
+    "api_base_path": "/api/v1/admin",
+    "jwt_role_claim": "roles",
+    "admin_role_value": "ROLE_ADMIN",
+    "shared_entities_already_exist": ["User", "Pharmacy", "Prescription", "Order"],
+    "shared_user_table": "users",
+    "shared_pharmacy_table": "pharmacies",
+    "existing_pharmacy_columns": ["id", "name", "address", "latitude", "longitude", "phone", "email"],
+    "note": "Add column active (TINYINT default 1) to pharmacies via Flyway migration V3."
+  },
+
+  "design_patterns": [
+    {
+      "pattern": "Singleton",
+      "implementation": "AdminDashboardService is a Spring @Service — the IoC container enforces single instance. Document this explicitly in a Javadoc comment on the class."
+    },
+    {
+      "pattern": "Observer",
+      "implementation": "After every pharmacy status toggle, publish an AdminActionEvent (extends ApplicationEvent) via ApplicationEventPublisher. An AuditLogListener annotated @EventListener @Async persists an AuditLog entity to the audit_logs table."
+    },
+    {
+      "pattern": "Factory Method",
+      "implementation": "Create a NotificationFactory with a static createNotification(String type, String recipient, String message) method that returns an EmailNotification or SmsNotification based on type. Call it from AdminPharmacyService after a status toggle."
+    },
+    {
+      "pattern": "Decorator",
+      "implementation": "Create a LoggingAdminPharmacyService that implements the same AdminPharmacyServiceI interface as AdminPharmacyService, wraps it, and logs method entry/exit with SLF4J. Register it as a @Primary bean."
+    }
+  ],
+
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Flyway migration V3 — Admin schema",
+      "file": "src/main/resources/db/migration/V3__admin_schema.sql",
+      "instructions": [
+        "Add column: ALTER TABLE pharmacies ADD COLUMN IF NOT EXISTS active TINYINT(1) NOT NULL DEFAULT 1",
+        "Create table admin_users: id BIGINT PK AUTO_INCREMENT, user_id BIGINT NOT NULL UNIQUE FK->users(id), created_at DATETIME DEFAULT CURRENT_TIMESTAMP",
+        "Create table audit_logs: id BIGINT PK AUTO_INCREMENT, admin_id BIGINT NOT NULL FK->users(id), action VARCHAR(100) NOT NULL, target_type VARCHAR(60), target_id BIGINT, detail TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP"
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "JPA Entities",
+      "files": [
+        "com/pharmacy/admin/entity/AdminUser.java",
+        "com/pharmacy/admin/entity/AuditLog.java"
+      ],
+      "instructions": [
+        "AdminUser: @Entity @Table(name='admin_users'), id, @OneToOne user (User), createdAt",
+        "AuditLog: @Entity @Table(name='audit_logs'), id, adminId (Long), action (String), targetType (String), targetId (Long), detail (String), createdAt (LocalDateTime @CreationTimestamp)"
+      ]
+    },
+    {
+      "id": "T3",
+      "title": "Spring Data Repositories",
+      "files": [
+        "com/pharmacy/admin/repository/AdminUserRepository.java",
+        "com/pharmacy/admin/repository/AuditLogRepository.java"
+      ],
+      "instructions": [
+        "AdminUserRepository extends JpaRepository<AdminUser, Long>",
+        "AuditLogRepository extends JpaRepository<AuditLog, Long> with method: Page<AuditLog> findAllByOrderByCreatedAtDesc(Pageable pageable)"
+      ]
+    },
+    {
+      "id": "T4",
+      "title": "DTOs",
+      "files": [
+        "com/pharmacy/admin/dto/UserSummaryDTO.java",
+        "com/pharmacy/admin/dto/PharmacySummaryDTO.java",
+        "com/pharmacy/admin/dto/DashboardStatsDTO.java",
+        "com/pharmacy/admin/dto/PharmacyStatusUpdateDTO.java"
+      ],
+      "instructions": [
+        "UserSummaryDTO: Long id, String email, String role, LocalDateTime createdAt — use Java record",
+        "PharmacySummaryDTO: Long id, String name, String address, boolean active, Double latitude, Double longitude — use Java record",
+        "DashboardStatsDTO: long totalUsers, long totalPharmacies, long activePharmacies, long totalPrescriptions, long prescriptionsToday, double treatmentRatePercent — use Java record",
+        "PharmacyStatusUpdateDTO: Boolean active with @NotNull(message='active field is required')"
+      ]
+    },
+    {
+      "id": "T5",
+      "title": "Observer: AdminActionEvent + AuditLogListener",
+      "files": [
+        "com/pharmacy/admin/observer/AdminActionEvent.java",
+        "com/pharmacy/admin/observer/AuditLogListener.java"
+      ],
+      "instructions": [
+        "AdminActionEvent extends ApplicationEvent: fields Long adminId, String action, String targetType, Long targetId, String detail. Constructor sets all fields and calls super(source).",
+        "AuditLogListener: @Component, method @EventListener(AdminActionEvent.class) @Async void handle(AdminActionEvent event) — build AuditLog from event fields and save via AuditLogRepository.",
+        "Add @EnableAsync to the main @SpringBootApplication class."
+      ]
+    },
+    {
+      "id": "T6",
+      "title": "Factory Method: NotificationFactory",
+      "files": [
+        "com/pharmacy/admin/factory/Notification.java",
+        "com/pharmacy/admin/factory/EmailNotification.java",
+        "com/pharmacy/admin/factory/SmsNotification.java",
+        "com/pharmacy/admin/factory/NotificationFactory.java"
+      ],
+      "instructions": [
+        "Notification interface: void send()",
+        "EmailNotification implements Notification: stores recipient and message, send() logs 'Sending EMAIL to {recipient}: {message}'",
+        "SmsNotification implements Notification: same but logs SMS",
+        "NotificationFactory: static Notification createNotification(String type, String recipient, String message) — returns EmailNotification if type.equalsIgnoreCase('EMAIL'), else SmsNotification"
+      ]
+    },
+    {
+      "id": "T7",
+      "title": "Service layer (interface + impl + decorator)",
+      "files": [
+        "com/pharmacy/admin/service/AdminUserService.java",
+        "com/pharmacy/admin/service/AdminPharmacyServiceI.java",
+        "com/pharmacy/admin/service/AdminPharmacyService.java",
+        "com/pharmacy/admin/service/LoggingAdminPharmacyService.java",
+        "com/pharmacy/admin/service/AdminDashboardService.java"
+      ],
+      "instructions": [
+        "AdminUserService: Page<UserSummaryDTO> getAllUsers(Pageable p) using UserRepository; UserSummaryDTO getUserById(Long id) throws EntityNotFoundException if absent. Map manually (no MapStruct needed).",
+        "AdminPharmacyServiceI interface: Page<PharmacySummaryDTO> getAllPharmacies(Pageable p); PharmacySummaryDTO getPharmacyById(Long id); PharmacySummaryDTO updateStatus(Long id, boolean active, Long adminId).",
+        "AdminPharmacyService implements AdminPharmacyServiceI: inject PharmacyRepository (shared), ApplicationEventPublisher, NotificationFactory. In updateStatus: fetch pharmacy, set active, save, publish AdminActionEvent, call NotificationFactory.createNotification('EMAIL', ...).send().",
+        "LoggingAdminPharmacyService: @Primary @Service decorator wrapping AdminPharmacyService (injected by constructor). Override each method to log entry/exit with SLF4J then delegate.",
+        "AdminDashboardService: @Service (Singleton). inject UserRepository, PharmacyRepository, PrescriptionRepository, OrderRepository. Implement getStats() computing all DashboardStatsDTO fields. Add Javadoc: '/* Singleton — single instance managed by Spring IoC container */'."
+      ]
+    },
+    {
+      "id": "T8",
+      "title": "Global Exception Handler",
+      "file": "com/pharmacy/admin/exception/GlobalExceptionHandler.java",
+      "instructions": [
+        "@RestControllerAdvice class",
+        "Handle EntityNotFoundException -> 404 with JSON body {timestamp, status:404, error:'Not Found', message, path}",
+        "Handle MethodArgumentNotValidException -> 400 listing field errors",
+        "Handle AccessDeniedException -> 403",
+        "Handle generic Exception -> 500"
+      ]
+    },
+    {
+      "id": "T9",
+      "title": "Security configuration",
+      "file": "com/pharmacy/admin/security/AdminSecurityConfig.java",
+      "instructions": [
+        "@Configuration @EnableWebSecurity @EnableMethodSecurity",
+        "SecurityFilterChain bean: permit /api/v1/auth/**, /swagger-ui/**, /v3/api-docs/**; require ROLE_ADMIN for /api/v1/admin/**; all other requests authenticated.",
+        "Add JwtAuthenticationFilter (assume it already exists in shared security package) to the filter chain before UsernamePasswordAuthenticationFilter.",
+        "PasswordEncoder bean: BCryptPasswordEncoder(strength=12)."
+      ]
+    },
+    {
+      "id": "T10",
+      "title": "REST Controllers",
+      "files": [
+        "com/pharmacy/admin/controller/AdminUserController.java",
+        "com/pharmacy/admin/controller/AdminPharmacyController.java",
+        "com/pharmacy/admin/controller/AdminDashboardController.java"
+      ],
+      "instructions": [
+        "All controllers: @RestController @RequestMapping('/api/v1/admin') @PreAuthorize(\"hasRole('ADMIN')\") @Tag(name='Admin', description='Administrator operations')",
+        "AdminUserController: GET /users (Pageable, @PageableDefault(size=10)) -> 200 Page<UserSummaryDTO>; GET /users/{id} -> 200 UserSummaryDTO or 404.",
+        "AdminPharmacyController: GET /pharmacies (Pageable) -> 200; GET /pharmacies/{id} -> 200 or 404; PATCH /pharmacies/{id}/status (@RequestBody @Valid PharmacyStatusUpdateDTO, @AuthenticationPrincipal to extract adminId) -> 200 PharmacySummaryDTO.",
+        "AdminDashboardController: GET /dashboard -> 200 DashboardStatsDTO.",
+        "Each endpoint must have @Operation(summary='...') and @ApiResponse annotations for 200 and error cases."
+      ]
+    },
+    {
+      "id": "T11",
+      "title": "Unit Tests (JUnit 5 + Mockito)",
+      "files": [
+        "test/.../AdminUserServiceTest.java",
+        "test/.../AdminPharmacyServiceTest.java",
+        "test/.../AdminDashboardServiceTest.java",
+        "test/.../AuditLogListenerTest.java",
+        "test/.../AdminPharmacyControllerTest.java"
+      ],
+      "instructions": [
+        "AdminUserServiceTest: mock UserRepository; test getAllUsers returns mapped DTOs; test getUserById throws EntityNotFoundException for unknown id.",
+        "AdminPharmacyServiceTest (TDD — write tests first): test updateStatus sets active correctly; test updateStatus publishes AdminActionEvent; test updateStatus throws 404 for unknown id.",
+        "AdminDashboardServiceTest: mock all 4 repositories; test getStats returns correct DashboardStatsDTO with expected values.",
+        "AuditLogListenerTest: create AdminActionEvent, call handle(), verify auditLogRepository.save() called once with correct fields.",
+        "AdminPharmacyControllerTest: use @WebMvcTest; test PATCH /pharmacies/1/status returns 200 with valid body; test same endpoint returns 400 with missing active field; test returns 403 without ADMIN role.",
+        "Target: JaCoCo >= 80% instruction coverage on com.pharmacy.admin package."
+      ]
+    },
+    {
+      "id": "T12",
+      "title": "Integration Tests",
+      "file": "test/.../AdminIntegrationTest.java",
+      "instructions": [
+        "@SpringBootTest(webEnvironment=RANDOM_PORT) @AutoConfigureMockMvc @ActiveProfiles('test')",
+        "application-test.yml: spring.datasource.url=jdbc:h2:mem:testdb, spring.jpa.hibernate.ddl-auto=create-drop",
+        "Seed one AdminUser and one Pharmacy in @BeforeEach via repositories (no SQL scripts).",
+        "Test: GET /api/v1/admin/users with valid admin JWT returns 200 and non-empty content array.",
+        "Test: PATCH /api/v1/admin/pharmacies/{id}/status with {active:false} returns 200 and active=false in body.",
+        "Test: GET /api/v1/admin/dashboard returns 200 with treatmentRatePercent field.",
+        "Test: any admin endpoint without JWT returns 403.",
+        "Helper method generateAdminJwt() creates a test JWT signed with the same secret key from application-test.yml."
+      ]
+    },
+    {
+      "id": "T13",
+      "title": "Postman Collection",
+      "file": "Admin_Workflow.postman_collection.json",
+      "instructions": [
+        "Collection name: Admin Workflow — INF4121",
+        "Pre-request script at collection level: POST {{baseUrl}}/api/v1/auth/login with body {email: {{adminEmail}}, password: {{adminPassword}}}; store response token in pm.collectionVariables.set('token', ...)",
+        "Variables: baseUrl=http://localhost:8080, adminEmail=admin@pharmacy.ma, adminPassword=Admin@1234",
+        "Requests:",
+        "  1. GET {{baseUrl}}/api/v1/admin/users — header Authorization: Bearer {{token}} — test: status 200, body.content is array",
+        "  2. GET {{baseUrl}}/api/v1/admin/users/1 — test: status 200, body.id exists",
+        "  3. GET {{baseUrl}}/api/v1/admin/pharmacies — test: status 200",
+        "  4. PATCH {{baseUrl}}/api/v1/admin/pharmacies/1/status body {active:false} — test: status 200, body.active === false",
+        "  5. PATCH {{baseUrl}}/api/v1/admin/pharmacies/1/status body {active:true} — test: status 200, body.active === true",
+        "  6. GET {{baseUrl}}/api/v1/admin/dashboard — test: status 200, body.treatmentRatePercent is number",
+        "  7. GET {{baseUrl}}/api/v1/admin/users no auth header — test: status 403",
+        "Run command: newman run Admin_Workflow.postman_collection.json --reporters cli,json --reporter-json-export newman-report.json"
+      ]
+    }
+  ],
+
+  "file_generation_order": [
+    "T1 (SQL migration)",
+    "T2 (entities)",
+    "T3 (repositories)",
+    "T4 (DTOs)",
+    "T5 (Observer)",
+    "T6 (Factory)",
+    "T7 (Services)",
+    "T8 (Exception handler)",
+    "T9 (Security config)",
+    "T10 (Controllers)",
+    "T11 (Unit tests)",
+    "T12 (Integration tests)",
+    "T13 (Postman collection)"
+  ],
+
+  "quality_gates": {
+    "jacoco_minimum_instruction_coverage": 0.80,
+    "jacoco_minimum_branch_coverage": 0.70,
+    "newman_failed_tests_allowed": 0,
+    "design_patterns_minimum": 4,
+    "tdd_features_minimum": 2,
+    "swagger_endpoints_documented": true,
+    "audit_log_on_every_status_toggle": true
+  },
+
+  "output_format": "For each task, output: (1) the full file path, (2) the complete file content, (3) a [DONE] summary line. Do not skip any task. Do not use TODO comments in production code."
+}
