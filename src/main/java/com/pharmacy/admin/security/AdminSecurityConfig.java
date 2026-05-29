@@ -36,6 +36,8 @@ public class AdminSecurityConfig {
                     "/index.html",
                     "/api/v1/auth/**",
                     "/swagger-ui/**",
+                    "/api/v1/patient/auth/**",
+                    "/uploads/**",
                     "/swagger-ui.html",
                     "/v3/api-docs/**"
                 ).permitAll()

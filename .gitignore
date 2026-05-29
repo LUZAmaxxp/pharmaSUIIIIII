@@ -48,3 +48,7 @@ desktop.ini
 target/site/
 target/surefire-reports/
 target/jacoco.exec
+
+
+
+uploads/

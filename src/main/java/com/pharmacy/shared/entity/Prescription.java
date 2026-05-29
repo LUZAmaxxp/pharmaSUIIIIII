@@ -24,6 +24,9 @@ public class Prescription {
     @Column(nullable = false)
     private String status = "PENDING";
 
+    @Column(nullable = false)
+    private String fileUrl;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
@@ -44,4 +47,8 @@ public class Prescription {
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public String getFileUrl() {return fileUrl;}
+
+    public void setFileUrl(String fileUrl) {this.fileUrl = fileUrl;}
 }
